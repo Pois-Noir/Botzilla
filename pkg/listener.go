@@ -1,9 +1,9 @@
 package botzillaclient
 
 type CommandListener interface {
-	OnReceive() string
+	OnReceive(body string) (string, error)
 }
 
 type MessageListener interface {
-	OnReceive() string
+	OnReceive(body string)
 }
