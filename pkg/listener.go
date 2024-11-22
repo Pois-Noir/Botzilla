@@ -1,9 +1,14 @@
 package botzillaclient
 
-type CommandListener interface {
-	OnReceive(body string) (string, error)
+type Listener interface {
+	Command(body string) (string, error)
+	Message(body string) error
+	Stream() // Not sure yet how :(
 }
 
-type MessageListener interface {
-	OnReceive(body string)
+type Config struct {
+	Name        string
+	CommandPort int
+	MessagePort int
+	StreamPort  int
 }
