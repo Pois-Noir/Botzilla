@@ -2,18 +2,41 @@ package botzillaclient
 
 import (
 	"botzillaclient/core"
-	"fmt"
+	"encoding/json"
 	"net"
 )
 
 // Returns a token from server
 func StartListener(serverAddress string, config Config, listener Listener) (string, error) {
 
-	// TODO
-	/*
-		Request Server for a token
-	*/
-	token := "1234"
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return "", err
+	}
+
+	defer conn.Close()
+
+	message := map[string]string{
+		"follower": "0000",
+		"body":     "0000" + config.Name + "," + "your mom",
+	}
+
+	decodedMessage, err := json.Marshal(message)
+
+	if err != nil {
+		return "", err
+	}
+
+	conn.Write(decodedMessage)
+	conn.Write([]byte("\n"))
+
+	buffer := make([]byte, 1024)
+	_, err = conn.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	token := string(buffer)
 
 	commandHandler := core.BaseCommandHandler(listener.Command)
 	messageHandler := core.BaseMessageHandler(listener.Message)
@@ -29,25 +52,25 @@ func StartListener(serverAddress string, config Config, listener Listener) (stri
 
 func SendCommand(serverAddress string, token string, follower string, body string) (string, error) {
 
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return "", fmt.Errorf("Error opening connection to botzilla, ", err)
-	}
-
+	// conn, err := net.Dial("tcp", serverAddress)
+	// if err != nil {
+	// 	return "", fmt.Errorf("Error opening connection to botzilla, ", err)
+	// }
+	return "", nil
 }
 
 func BoardCastMessage(serverAddress string, token string, followers []string, body string) error {
-
+	return nil
 }
 
 func AssignGroup(serverAddress string, token string, groupName string) error {
-
+	return nil
 }
 
 func RemoveGroup(serverAddress string, token string, groupName string) error {
-
+	return nil
 }
 
 func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
-
+	return []string{}, nil
 }
