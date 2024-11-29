@@ -39,7 +39,7 @@ func main() {
 
 	listener := myListener{}
 
-	token, err := botzillaclient.StartListener("localhost:8080", config, listener)
+	token, err := botzillaclient.StartListener("localhost:6985", config, listener)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -47,8 +47,5 @@ func main() {
 	}
 
 	println(token)
-
-	for {
-	}
 
 }
