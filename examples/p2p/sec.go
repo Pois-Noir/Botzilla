@@ -30,16 +30,26 @@ func (l myListener) Stream() {
 
 func main() {
 
+	//******************************************************
+	//	SENARIO Setting
+	serverAddress := "localhost:6985"
+	secName := "sec"
+	openCommandPortOn := 6788
+	openMessagePortOn := 4433
+	openStreamPortOn := 1213
+
+	//******************************************************
+
 	config := botzillaclient.Config{
-		Name:        "sec",
-		CommandPort: 6787,
-		MessagePort: 4432,
-		StreamPort:  1212,
+		Name:        secName,
+		CommandPort: openCommandPortOn,
+		MessagePort: openMessagePortOn,
+		StreamPort:  openStreamPortOn,
 	}
 
 	listener := myListener{}
 
-	token, err := botzillaclient.StartListener("localhost:6985", config, listener)
+	token, err := botzillaclient.StartListener(serverAddress, config, listener)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -48,4 +58,6 @@ func main() {
 
 	println(token)
 
+	for {
+	}
 }

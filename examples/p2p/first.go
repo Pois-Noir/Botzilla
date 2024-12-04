@@ -30,16 +30,27 @@ func (l myListener) Stream() {
 
 func main() {
 
+	//******************************************************
+	//	SENARIO Setting
+	serverAddress := "localhost:6985"
+	firstName := "first"
+	secName := "sec"
+	openCommandPortOn := 6787
+	openMessagePortOn := 4432
+	openStreamPortOn := 1212
+
+	//******************************************************
+
 	config := botzillaclient.Config{
-		Name:        "firstsa",
-		CommandPort: 6787,
-		MessagePort: 4432,
-		StreamPort:  1212,
+		Name:        firstName,
+		CommandPort: openCommandPortOn,
+		MessagePort: openMessagePortOn,
+		StreamPort:  openStreamPortOn,
 	}
 
 	listener := myListener{}
 
-	token, err := botzillaclient.StartListener("localhost:6985", config, listener)
+	token, err := botzillaclient.StartListener(serverAddress, config, listener)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -48,6 +59,26 @@ func main() {
 
 	println(token)
 
-	botzillaclient.GetComponents("localhost:6985", token)
+	components, err := botzillaclient.GetComponents(serverAddress, token)
+
+	if err != nil {
+		fmt.Println("Error getting the componets")
+		os.Exit(1)
+	}
+
+	exist := false
+	for _, name := range components {
+		if name == secName {
+			exist = true
+			break
+		}
+	}
+
+	if !exist {
+		fmt.Println("Target Component is not registered in botzilla")
+		os.Exit(1)
+	}
+
+	botzillaclient.SendCommand(serverAddress, token, secName, "fuck you")
 
 }

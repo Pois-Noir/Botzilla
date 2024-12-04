@@ -3,8 +3,9 @@ package botzillaclient
 import (
 	"botzillaclient/core"
 	"encoding/json"
-	"fmt"
 	"net"
+	"strconv"
+	"strings"
 )
 
 // Returns a token from server
@@ -19,7 +20,7 @@ func StartListener(serverAddress string, config Config, listener Listener) (stri
 
 	message := map[string]string{
 		"follower": "0000",
-		"body":     "0000" + config.Name + "," + "your mom",
+		"body":     "0000" + config.Name + "," + "localhost:" + strconv.Itoa(config.CommandPort),
 	}
 
 	decodedMessage, err := json.Marshal(message)
@@ -53,11 +54,33 @@ func StartListener(serverAddress string, config Config, listener Listener) (stri
 
 func SendCommand(serverAddress string, token string, follower string, body string) (string, error) {
 
-	// conn, err := net.Dial("tcp", serverAddress)
-	// if err != nil {
-	// 	return "", fmt.Errorf("Error opening connection to botzilla, ", err)
-	// }
-	return "", nil
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return "", err
+	}
+
+	message := map[string]string{
+		"follower": follower,
+		"body":     body,
+	}
+
+	decoded, err := json.Marshal(message)
+	if err != nil {
+		return "", err
+	}
+
+	conn.Write(decoded)
+	conn.Write([]byte("\n"))
+
+	buffer := make([]byte, 1024)
+	_, err = conn.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	response := string(buffer)
+
+	return response, nil
 }
 
 func BoardCastMessage(serverAddress string, token string, followers []string, body string) error {
@@ -78,31 +101,12 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 
 func GetComponents(serverAddress string, token string) ([]string, error) {
 
-	conn, err := net.Dial("tcp", serverAddress)
+	response, err := SendCommand(serverAddress, token, "0000", "0001")
 	if err != nil {
 		return nil, err
 	}
+	names := strings.Split(response, ",")
 
-	message := map[string]string{
-		"follower": "0000",
-		"body":     "0001",
-	}
-
-	decoded, err := json.Marshal(message)
-	if err != nil {
-		return nil, err
-	}
-
-	conn.Write(decoded)
-	conn.Write([]byte("\n"))
-
-	buffer := make([]byte, 1024)
-	_, err = conn.Read(buffer)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(string(buffer))
-	return nil, nil
+	return names, nil
 
 }

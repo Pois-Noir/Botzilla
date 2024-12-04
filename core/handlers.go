@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 )
@@ -16,16 +17,20 @@ func BaseCommandHandler(listener func(body string) (string, error)) func(conn ne
 		reader := bufio.NewReader(conn)
 
 		// Read the entire message (this will read until it finds a newline or EOF)
-		rawMessage, err := reader.ReadString('\n')
+		rawMessage, err := reader.ReadBytes('\n')
+
 		if err != nil {
+			println("really")
 			if err.Error() != "EOF" {
 				fmt.Println("Error reading Command:", err)
 			}
 			return
 		}
+		var message map[string]string
+		json.Unmarshal(rawMessage, &message)
 
 		// Process the raw message using the listener
-		response, err := listener(rawMessage)
+		response, err := listener(message["body"])
 		if err != nil {
 			fmt.Println("Listener Failed with following err:", err)
 			return
