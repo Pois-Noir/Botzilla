@@ -28,3 +28,7 @@ func StartTCPServer(port int, handler func(conn net.Conn)) {
 		go handler(conn)
 	}
 }
+
+func SendTCPPacket(serverAddress string, message map[string]string) {
+
+}

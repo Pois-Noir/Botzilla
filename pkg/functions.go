@@ -3,6 +3,7 @@ package botzillaclient
 import (
 	"botzillaclient/core"
 	"encoding/json"
+	"fmt"
 	"net"
 )
 
@@ -73,4 +74,35 @@ func RemoveGroup(serverAddress string, token string, groupName string) error {
 
 func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 	return []string{}, nil
+}
+
+func GetComponents(serverAddress string, token string) ([]string, error) {
+
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	message := map[string]string{
+		"follower": "0000",
+		"body":     "0001",
+	}
+
+	decoded, err := json.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+
+	conn.Write(decoded)
+	conn.Write([]byte("\n"))
+
+	buffer := make([]byte, 1024)
+	_, err = conn.Read(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(string(buffer))
+	return nil, nil
+
 }
