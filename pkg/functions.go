@@ -2,14 +2,15 @@ package botzillaclient
 
 import (
 	"botzillaclient/core"
-	"encoding/json"
+	"bufio"
+	"fmt"
 	"net"
-	"strconv"
-	"strings"
 )
 
+//Hidden Listener/Receiver for server to check if the component is live
+
 // Returns a token from server
-func StartListener(serverAddress string, config Config, listener Listener) (string, error) {
+func RegisterComponent(serverAddress string, name string, port int, userHandler UserHandler) (string, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
@@ -18,20 +19,16 @@ func StartListener(serverAddress string, config Config, listener Listener) (stri
 
 	defer conn.Close()
 
-	message := map[string]string{
-		"follower": "0000",
-		"body":     "0000" + config.Name + "," + "localhost:" + strconv.Itoa(config.CommandPort),
-	}
-
-	decodedMessage, err := json.Marshal(message)
-
-	if err != nil {
-		return "", err
-	}
-
-	conn.Write(decodedMessage)
+	//-------------------------------------------------
+	// Registration
+	message :=
+		"0000"+ name
+	
+	
+	conn.Write([]byte(message))
 	conn.Write([]byte("\n"))
 
+	// Todo: Buffer size problem for receiving data
 	buffer := make([]byte, 1024)
 	_, err = conn.Read(buffer)
 	if err != nil {
@@ -40,62 +37,214 @@ func StartListener(serverAddress string, config Config, listener Listener) (stri
 
 	token := string(buffer)
 
-	commandHandler := core.BaseCommandHandler(listener.Command)
-	messageHandler := core.BaseMessageHandler(listener.Message)
-	streamHandler := core.BaseStreamHandler(listener.Stream)
-
-	go core.StartTCPServer(config.CommandPort, commandHandler)
-	go core.StartTCPServer(config.MessagePort, messageHandler)
-	go core.StartTCPServer(config.StreamPort, streamHandler)
+	//---------------------------------------------------
+	//starting listener
+	go startListener(port, userHandler)
 
 	return token, nil
 
 }
 
-func SendCommand(serverAddress string, token string, follower string, body string) (string, error) {
+func startListener(port int, userHandler UserHandler){
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	defer listener.Close()
+
+	if err != nil {
+		fmt.Println("There was an error starting the server: \n", err)
+		return 
+	}
+
+	for {
+
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: \n", err)
+			continue
+		}
+
+		go connectionHandler(conn, userHandler)
+	}
+}
+
+func connectionHandler(conn net.Conn, userHandler UserHandler){
+	defer conn.Close()
+
+	// Create a buffered reader
+	reader := bufio.NewReader(conn)
+
+	// Read the entire message (this will read until it finds a newline or EOF)
+	rawMessage, err := reader.ReadBytes('\n')
+
+	if err != nil {
+		fmt.Printf("Failed to read message: %v\n", err)
+		return
+	}
+
+	request, err := core.Decode(rawMessage)
+	if err != nil {
+		fmt.Println("go fuck yourself")
+	}
+
+	pt := (*request).Header["type"]
+
+	if pt == "message" {
+		response, err := userHandler.Message((*request).Body , (*request).Header["origin"])
+		if err != nil {
+			fmt.Println("error in user handler")
+			fmt.Println(err)
+			return
+		}
+		conn.Write([]byte(response))
+	} else if pt == "broadcast" {
+		err := userHandler.Broadcast((*request).Body , (*request).Header["origin"])
+		if err != nil {
+			fmt.Println("error in user handler")
+			fmt.Println(err)
+			return
+		}
+	}
+
+}
+
+/*
+func SendMessage(serverAddress string, token string, dest string, body string) (string, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		return "", err
 	}
 
+	//TODO get the address of the destination, then send the message
 	message := map[string]string{
-		"follower": follower,
 		"body":     body,
 	}
 
-	decoded, err := json.Marshal(message)
+	decodedMessage, err := json.Marshal(message)
 	if err != nil {
 		return "", err
 	}
 
-	conn.Write(decoded)
+	conn.Write(decodedMessage)
 	conn.Write([]byte("\n"))
 
-	buffer := make([]byte, 1024)
-	_, err = conn.Read(buffer)
+	bufferreader := bufio.NewReader(conn)
+
+	rawresponse,err := bufferreader.ReadString('\n')
+
 	if err != nil {
 		return "", err
 	}
 
-	response := string(buffer)
+	response := string(rawresponse)
 
 	return response, nil
 }
 
-func BoardCastMessage(serverAddress string, token string, followers []string, body string) error {
+func BroadCast(serverAddress string, token string, dest []string, body string) error {
+	
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return err
+	}
+
+	message := map[string]string{
+		"body":     body,
+	}
+
+	decodedMessage, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	conn.Write(decodedMessage)
+	conn.Write([]byte("\n"))
+
+	bufferreader := bufio.NewReader(conn)
+
+	rawresponse,err := bufferreader.ReadString('\n')
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func AssignGroup(serverAddress string, token string, groupName string) error {
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return err
+	}
+
+	defer conn.Close()
+
+	message :=
+		"0001"+ groupName
+	
+	conn.Write([]byte(message))
+	conn.Write([]byte("\n"))
+
+	bufferreader := bufio.NewReader(conn)
+
+	res, err := bufferreader.ReadString('\n')
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func RemoveGroup(serverAddress string, token string, groupName string) error {
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return err
+	}
+
+	defer conn.Close()
+
+	message :=
+		"0002"+ groupName
+	
+	conn.Write([]byte(message))
+	conn.Write([]byte("\n"))
+
+	bufferreader := bufio.NewReader(conn)
+
+	res, err := bufferreader.ReadString('\n')
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
+	
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return nil,err
+	}
+
+	defer conn.Close()
+
+	message :=
+		"0003"
+	
+	conn.Write([]byte(message))
+	conn.Write([]byte("\n"))
+
+	bufferreader := bufio.NewReader(conn)
+	groups:= [] string{}
+	groups, err = bufferreader.ReadString('\n')
+
+	if err != nil {
+		return nil,err
+	}
+
+	
 	return []string{}, nil
 }
 
@@ -110,3 +259,4 @@ func GetComponents(serverAddress string, token string) ([]string, error) {
 	return names, nil
 
 }
+*/

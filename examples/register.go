@@ -8,7 +8,7 @@ import (
 
 type myListener struct{}
 
-func (l myListener) Command(body string) (string, error) {
+func (l myListener) Message(body string, _ string ) (string, error) {
 
 	fmt.Println("Running command listener")
 	fmt.Println(body)
@@ -16,7 +16,7 @@ func (l myListener) Command(body string) (string, error) {
 	return "Command Recieved", nil
 }
 
-func (l myListener) Message(body string) error {
+func (l myListener) Broadcast(body string, _ string) error {
 
 	fmt.Println("Running Message Listener")
 	fmt.Println(body)
@@ -24,22 +24,13 @@ func (l myListener) Message(body string) error {
 	return nil
 }
 
-func (l myListener) Stream() {
-	fmt.Println("streaming is not supported yet :O")
-}
-
 func main() {
 
-	config := botzillaclient.Config{
-		Name:        "Comp1",
-		CommandPort: 6787,
-		MessagePort: 4432,
-		StreamPort:  1212,
-	}
+	
 
-	listener := myListener{}
+	amirgay := myListener{}
 
-	token, err := botzillaclient.StartListener("localhost:6985", config, listener)
+	token, err := botzillaclient.RegisterComponent("localhost:6985","comp",6969 , amirgay)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)

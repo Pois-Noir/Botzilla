@@ -1,0 +1,5 @@
+1. Finish registraation
+1.1 Finish the handlers
+1.2 Finish token generation on server side
+
+2. Explore unreal 
