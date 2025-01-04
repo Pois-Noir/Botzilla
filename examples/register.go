@@ -8,7 +8,7 @@ import (
 
 type myListener struct{}
 
-func (l myListener) Message(body string, _ string ) (string, error) {
+func (l myListener) Message(body string, _ string) (string, error) {
 
 	fmt.Println("Running command listener")
 	fmt.Println(body)
@@ -26,11 +26,9 @@ func (l myListener) Broadcast(body string, _ string) error {
 
 func main() {
 
-	
-
 	amirgay := myListener{}
 
-	token, err := botzillaclient.RegisterComponent("localhost:6985","comp",6969 , amirgay)
+	token, err := botzillaclient.RegisterComponent("localhost:6985", "comp2", 6969, amirgay)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -38,5 +36,8 @@ func main() {
 	}
 
 	println(token)
+
+	response, err := botzillaclient.GetComponents("localhost:6985", token)
+	fmt.Println(response)
 
 }

@@ -23,16 +23,14 @@ func RegisterComponent(serverAddress string, name string, port int, userHandler 
 	//-------------------------------------------------
 	// Registration
 
-	code := []byte {0}
+	code := []byte{0}
 	namebyte := []byte(name)
 	message :=
 		append(code, namebyte...)
-	
-	
+
 	conn.Write(message)
 	conn.Write([]byte("\n"))
 
-	
 	buffer := make([]byte, 16)
 	_, err = conn.Read(buffer)
 	if err != nil {
@@ -49,14 +47,14 @@ func RegisterComponent(serverAddress string, name string, port int, userHandler 
 
 }
 
-func startListener(port int, userHandler UserHandler){
+func startListener(port int, userHandler UserHandler) {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	defer listener.Close()
 
 	if err != nil {
 		fmt.Println("There was an error starting the server: \n", err)
-		return 
+		return
 	}
 
 	for {
@@ -71,7 +69,7 @@ func startListener(port int, userHandler UserHandler){
 	}
 }
 
-func connectionHandler(conn net.Conn, userHandler UserHandler){
+func connectionHandler(conn net.Conn, userHandler UserHandler) {
 	defer conn.Close()
 
 	// Create a buffered reader
@@ -93,7 +91,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler){
 	pt := (*request).Header["type"]
 
 	if pt == "message" {
-		response, err := userHandler.Message((*request).Body , (*request).Header["origin"])
+		response, err := userHandler.Message((*request).Body, (*request).Header["origin"])
 		if err != nil {
 			fmt.Println("error in user handler")
 			fmt.Println(err)
@@ -101,7 +99,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler){
 		}
 		conn.Write([]byte(response))
 	} else if pt == "broadcast" {
-		err := userHandler.Broadcast((*request).Body , (*request).Header["origin"])
+		err := userHandler.Broadcast((*request).Body, (*request).Header["origin"])
 		if err != nil {
 			fmt.Println("error in user handler")
 			fmt.Println(err)
@@ -111,6 +109,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler){
 
 }
 
+/*
 
 func SendMessage(serverAddress string, token string, dest string, body string) (string, error) {
 
@@ -146,7 +145,7 @@ func SendMessage(serverAddress string, token string, dest string, body string) (
 }
 
 func BroadCast(serverAddress string, token string, dest []string, body string) error {
-	
+
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		return err
@@ -185,7 +184,7 @@ func AssignGroup(serverAddress string, token string, groupName string) error {
 
 	message :=
 		"0001"+ groupName
-	
+
 	conn.Write([]byte(message))
 	conn.Write([]byte("\n"))
 
@@ -210,7 +209,7 @@ func RemoveGroup(serverAddress string, token string, groupName string) error {
 
 	message :=
 		"0002"+ groupName
-	
+
 	conn.Write([]byte(message))
 	conn.Write([]byte("\n"))
 
@@ -226,7 +225,7 @@ func RemoveGroup(serverAddress string, token string, groupName string) error {
 }
 
 func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
-	
+
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		return nil,err
@@ -236,7 +235,7 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 
 	message :=
 		"0003"
-	
+
 	conn.Write([]byte(message))
 	conn.Write([]byte("\n"))
 
@@ -248,59 +247,44 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 		return nil,err
 	}
 
-	
+
 	return []string{}, nil
 }
 
-func GetComponents(serverAddress string, token string) (string, error) {
-	var res string
+*/
+
+func GetComponents(serverAddress string, token string) ([]string, error) {
+
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
-	code := [] byte{69}
-	message := 
-		code
-	
+	message := []byte{69}
+
 	conn.Write(message)
-	conn.Write([]byte("\n"))
-
-	
-	buffer := make([]byte, 16)
-	_, err = conn.Read(buffer)
-	if err != nil {
-		return "", err
-	}
-	decodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return "", err
-	}
-
-	conn.Write(decodedMessage)
 	conn.Write([]byte("\n"))
 
 	bufferreader := bufio.NewReader(conn)
 
-	rawresponse,err := bufferreader.ReadString('\n')
+	rawResponse, err := bufferreader.ReadBytes('\n')
 
-	if err != nil {
-		return res, err
-	}
+	var decodeMessage []string
+	err = json.Unmarshal(rawResponse, &decodeMessage)
 
-	res = string(rawresponse)
-
-	
-
-	return res, nil
-	/*
-	response, err := SendMessage(serverAddress, token, "0000", "0001")
 	if err != nil {
 		return nil, err
 	}
-	names := strings.Split(response, ",")
 
-	return names, nil
+	return decodeMessage, nil
+	/*
+		response, err := SendMessage(serverAddress, token, "0000", "0001")
+		if err != nil {
+			return nil, err
+		}
+		names := strings.Split(response, ",")
+
+		return names, nil
 	*/
 
 }
