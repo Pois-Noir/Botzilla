@@ -3,6 +3,7 @@ package botzillaclient
 import (
 	"botzillaclient/core"
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 )
@@ -21,15 +22,18 @@ func RegisterComponent(serverAddress string, name string, port int, userHandler 
 
 	//-------------------------------------------------
 	// Registration
+
+	code := []byte {0}
+	namebyte := []byte(name)
 	message :=
-		"0000"+ name
+		append(code, namebyte...)
 	
 	
-	conn.Write([]byte(message))
+	conn.Write(message)
 	conn.Write([]byte("\n"))
 
-	// Todo: Buffer size problem for receiving data
-	buffer := make([]byte, 1024)
+	
+	buffer := make([]byte, 16)
 	_, err = conn.Read(buffer)
 	if err != nil {
 		return "", err
@@ -107,7 +111,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler){
 
 }
 
-/*
+
 func SendMessage(serverAddress string, token string, dest string, body string) (string, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
@@ -248,15 +252,55 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 	return []string{}, nil
 }
 
-func GetComponents(serverAddress string, token string) ([]string, error) {
+func GetComponents(serverAddress string, token string) (string, error) {
+	var res string
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return res, err
+	}
 
-	response, err := SendCommand(serverAddress, token, "0000", "0001")
+	code := [] byte{69}
+	message := 
+		code
+	
+	conn.Write(message)
+	conn.Write([]byte("\n"))
+
+	
+	buffer := make([]byte, 16)
+	_, err = conn.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+	decodedMessage, err := json.Marshal(message)
+	if err != nil {
+		return "", err
+	}
+
+	conn.Write(decodedMessage)
+	conn.Write([]byte("\n"))
+
+	bufferreader := bufio.NewReader(conn)
+
+	rawresponse,err := bufferreader.ReadString('\n')
+
+	if err != nil {
+		return res, err
+	}
+
+	res = string(rawresponse)
+
+	
+
+	return res, nil
+	/*
+	response, err := SendMessage(serverAddress, token, "0000", "0001")
 	if err != nil {
 		return nil, err
 	}
 	names := strings.Split(response, ",")
 
 	return names, nil
+	*/
 
 }
-*/
