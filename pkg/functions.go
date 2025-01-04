@@ -109,39 +109,67 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 
 }
 
-/*
 
-func SendMessage(serverAddress string, token string, dest string, body string) (string, error) {
+
+func SendMessage(serverAddress string, token string, destination string, body map[string]string) (map[string]string, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	//TODO get the address of the destination, then send the message
-	message := map[string]string{
-		"body":     body,
-	}
+	code := []byte{2}
+	tokenbyte := []byte(token)
+	destinationbyte := []byte(destination)
 
-	decodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return "", err
-	}
+	message := 
+		append(
+		 append(code, tokenbyte...),
+		 destinationbyte...
+		)
+		 
 
-	conn.Write(decodedMessage)
+
+	conn.Write(message)
 	conn.Write([]byte("\n"))
 
-	bufferreader := bufio.NewReader(conn)
+	bufferreader := bufio.NewReader((conn))
 
-	rawresponse,err := bufferreader.ReadString('\n')
+	destinationAdress, err := bufferreader.ReadString('\n')
 
+	if err != nil{
+		return nil, err
+	}
+	
+	conn.Close()
+
+	conn, err = net.Dial("tcp", destinationAdress)
 	if err != nil {
-		return "", err
+		return nil, err
+	}
+	
+
+	encodedBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
 	}
 
-	response := string(rawresponse)
+	conn.Write(encodedBody)
+	conn.Write([]byte("\n"))
 
-	return response, nil
+	bufferreader = bufio.NewReader(conn)
+
+	rawResponse, err := bufferreader.ReadBytes('\n')
+
+	if err != nil {
+		return nil, err
+	}
+
+	var decodeMessage map[string]string
+	err = json.Unmarshal(rawResponse, &decodeMessage)
+	
+
+	return decodeMessage, nil
 }
 
 func BroadCast(serverAddress string, token string, dest []string, body string) error {
@@ -251,7 +279,7 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 	return []string{}, nil
 }
 
-*/
+
 
 func GetComponents(serverAddress string, token string) ([]string, error) {
 
@@ -259,8 +287,9 @@ func GetComponents(serverAddress string, token string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	message := []byte{69}
+	code := []byte{69}
+	tokenbyte := []byte(token)
+	message := append(code,tokenbyte...)
 
 	conn.Write(message)
 	conn.Write([]byte("\n"))
