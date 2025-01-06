@@ -37,7 +37,7 @@ func main() {
 
 	println(token)
 
-	response, err := botzilla.GetComponents("localhost:6985", token)
+	response, err := botzilla.GetComponents("localhost:6985", []byte(token))
 	fmt.Println(response)
 
 }

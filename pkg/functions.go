@@ -293,14 +293,11 @@ func requestServer(serverAddress string, message []byte, token []byte) ([]byte, 
 
 	buffer := make([]byte, responseSize)
 
-	for {
-		// Read exactly `fixedLength` bytes
-		_, err := conn.Read(buffer)
-		if err != nil {
-			fmt.Printf("Error reading from connection: %v\n", err)
-			return nil, err
-		}
+	_, err = conn.Read(buffer)
 
+	if err != nil {
+		fmt.Printf("Error reading from connection: %v\n", err)
+		return nil, err
 	}
 
 	return buffer, nil
