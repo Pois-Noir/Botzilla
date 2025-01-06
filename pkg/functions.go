@@ -3,6 +3,8 @@ package botzilla
 import (
 	"botzilla/core"
 	"bufio"
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -13,31 +15,17 @@ import (
 // Returns a token from server
 func RegisterComponent(serverAddress string, name string, port int, userHandler UserHandler) (string, error) {
 
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return "", err
-	}
-
-	defer conn.Close()
-
-	//-------------------------------------------------
-	// Registration
-
 	code := []byte{0}
-	namebyte := []byte(name)
+	nameBytes := []byte(name)
 	message :=
-		append(code, namebyte...)
+		append(code, nameBytes...)
 
-	conn.Write(message)
-	conn.Write([]byte("\n"))
-
-	buffer := make([]byte, 16)
-	_, err = conn.Read(buffer)
+	rawResponse, err := requestComponent(serverAddress, message)
 	if err != nil {
 		return "", err
 	}
 
-	token := string(buffer)
+	token := string(rawResponse)
 
 	//---------------------------------------------------
 	//starting listener
@@ -111,51 +99,26 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 
 func SendMessage(serverAddress string, token string, destination string, body map[string]string) (map[string]string, error) {
 
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	code := []byte{2}
-	tokenbyte := []byte(token)
-	destinationbyte := []byte(destination)
+	tokenBytes := []byte(token)
+	destinationBytes := []byte(destination)
 
 	message :=
 		append(
-			append(code, tokenbyte...),
-			destinationbyte...,
+			append(code, tokenBytes...),
+			destinationBytes...,
 		)
 
-	conn.Write(message)
-	conn.Write([]byte("\n"))
+	rawMessage, err := requestServer(serverAddress, message, token)
 
-	bufferreader := bufio.NewReader((conn))
-
-	destinationAdress, err := bufferreader.ReadString('\n')
-
-	if err != nil {
-		return nil, err
-	}
-
-	conn.Close()
-
-	conn, err = net.Dial("tcp", destinationAdress)
-	if err != nil {
-		return nil, err
-	}
+	destinationAddress := string(rawMessage)
 
 	encodedBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
-	conn.Write(encodedBody)
-	conn.Write([]byte("\n"))
-
-	bufferreader = bufio.NewReader(conn)
-
-	rawResponse, err := bufferreader.ReadBytes('\n')
-
+	rawResponse, err := requestComponent(destinationAddress, encodedBody)
 	if err != nil {
 		return nil, err
 	}
@@ -279,20 +242,9 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 
 func GetComponents(serverAddress string, token string) ([]string, error) {
 
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return nil, err
-	}
-	code := []byte{69}
-	tokenbyte := []byte(token)
-	message := append(code, tokenbyte...)
+	message := []byte{69}
 
-	conn.Write(message)
-	conn.Write([]byte("\n"))
-
-	bufferreader := bufio.NewReader(conn)
-
-	rawResponse, err := bufferreader.ReadBytes('\n')
+	rawResponse, err := requestServer(serverAddress, message, token)
 
 	var decodeMessage []string
 	err = json.Unmarshal(rawResponse, &decodeMessage)
@@ -302,14 +254,101 @@ func GetComponents(serverAddress string, token string) ([]string, error) {
 	}
 
 	return decodeMessage, nil
-	/*
-		response, err := SendMessage(serverAddress, token, "0000", "0001")
+}
+
+func requestServer(serverAddress string, message []byte, token string) ([]byte, error) {
+
+	conn, err := net.Dial("tcp", serverAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	defer conn.Close()
+
+	// Generate Header for server
+	messageLength := int32(len(message))
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+		return nil, err
+	}
+
+	header := buf.Bytes()
+
+	// Send token for auth
+	conn.Write([]byte(token))
+	conn.Write(header)
+	conn.Write(message)
+
+	responseHeader := [4]byte{}
+	conn.Read(responseHeader[:])
+
+	// Convert Response Header to int32
+	responseSize := int32(responseHeader[0]) |
+		int32(responseHeader[1])<<8 |
+		int32(responseHeader[2])<<16 |
+		int32(responseHeader[3])<<24
+
+	buffer := make([]byte, responseSize)
+
+	for {
+		// Read exactly `fixedLength` bytes
+		_, err := conn.Read(buffer)
 		if err != nil {
+			fmt.Printf("Error reading from connection: %v\n", err)
 			return nil, err
 		}
-		names := strings.Split(response, ",")
 
-		return names, nil
-	*/
+	}
+
+	return buffer, nil
+
+}
+
+func requestComponent(componentAddress string, message []byte) ([]byte, error) {
+
+	conn, err := net.Dial("tcp", componentAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	defer conn.Close()
+
+	// Generate Header
+	messageLength := int32(len(message))
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+		return nil, err
+	}
+
+	// Send Header
+	conn.Write(buf.Bytes())
+	conn.Write(message)
+
+	responseHeader := [4]byte{}
+	conn.Read(responseHeader[:])
+
+	// Convert Response Header to int32
+	responseSize := int32(responseHeader[0]) |
+		int32(responseHeader[1])<<8 |
+		int32(responseHeader[2])<<16 |
+		int32(responseHeader[3])<<24
+
+	buffer := make([]byte, responseSize)
+
+	for {
+		// Read exactly `fixedLength` bytes
+		_, err := conn.Read(buffer)
+		if err != nil {
+			fmt.Printf("Error reading from connection: %v\n", err)
+			return nil, err
+		}
+
+	}
+
+	return buffer, nil
 
 }
