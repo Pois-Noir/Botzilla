@@ -17,10 +17,11 @@ func RegisterComponent(serverAddress string, name string, port int, userHandler 
 
 	code := []byte{0}
 	nameBytes := []byte(name)
+	var genericToken [16]byte
 	message :=
 		append(code, nameBytes...)
 
-	rawResponse, err := requestComponent(serverAddress, message)
+	rawResponse, err := requestServer(serverAddress, message, genericToken[:])
 	if err != nil {
 		return "", err
 	}
@@ -97,7 +98,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 
 }
 
-func SendMessage(serverAddress string, token string, destination string, body map[string]string) (map[string]string, error) {
+func SendMessage(serverAddress string, token []byte, destination string, body map[string]string) (map[string]string, error) {
 
 	code := []byte{2}
 	tokenBytes := []byte(token)
@@ -240,7 +241,7 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 
 */
 
-func GetComponents(serverAddress string, token string) ([]string, error) {
+func GetComponents(serverAddress string, token []byte) ([]string, error) {
 
 	message := []byte{69}
 
@@ -256,7 +257,7 @@ func GetComponents(serverAddress string, token string) ([]string, error) {
 	return decodeMessage, nil
 }
 
-func requestServer(serverAddress string, message []byte, token string) ([]byte, error) {
+func requestServer(serverAddress string, message []byte, token []byte) ([]byte, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
@@ -277,7 +278,7 @@ func requestServer(serverAddress string, message []byte, token string) ([]byte, 
 	header := buf.Bytes()
 
 	// Send token for auth
-	conn.Write([]byte(token))
+	conn.Write(token)
 	conn.Write(header)
 	conn.Write(message)
 
