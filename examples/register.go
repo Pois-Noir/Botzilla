@@ -1,7 +1,7 @@
 package main
 
 import (
-	botzillaclient "botzillaclient/pkg"
+	botzilla "botzilla/pkg"
 	"fmt"
 	"os"
 )
@@ -28,7 +28,7 @@ func main() {
 
 	amirgay := myListener{}
 
-	token, err := botzillaclient.RegisterComponent("localhost:6985", "comp2", 6969, amirgay)
+	token, err := botzilla.RegisterComponent("localhost:6985", "comp2", 6969, amirgay)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -37,7 +37,7 @@ func main() {
 
 	println(token)
 
-	response, err := botzillaclient.GetComponents("localhost:6985", token)
+	response, err := botzilla.GetComponents("localhost:6985", token)
 	fmt.Println(response)
 
 }

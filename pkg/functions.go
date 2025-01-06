@@ -1,7 +1,7 @@
-package botzillaclient
+package botzilla
 
 import (
-	"botzillaclient/core"
+	"botzilla/core"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -109,8 +109,6 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 
 }
 
-
-
 func SendMessage(serverAddress string, token string, destination string, body map[string]string) (map[string]string, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
@@ -122,13 +120,11 @@ func SendMessage(serverAddress string, token string, destination string, body ma
 	tokenbyte := []byte(token)
 	destinationbyte := []byte(destination)
 
-	message := 
+	message :=
 		append(
-		 append(code, tokenbyte...),
-		 destinationbyte...
+			append(code, tokenbyte...),
+			destinationbyte...,
 		)
-		 
-
 
 	conn.Write(message)
 	conn.Write([]byte("\n"))
@@ -137,17 +133,16 @@ func SendMessage(serverAddress string, token string, destination string, body ma
 
 	destinationAdress, err := bufferreader.ReadString('\n')
 
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
-	
+
 	conn.Close()
 
 	conn, err = net.Dial("tcp", destinationAdress)
 	if err != nil {
 		return nil, err
 	}
-	
 
 	encodedBody, err := json.Marshal(body)
 	if err != nil {
@@ -167,10 +162,11 @@ func SendMessage(serverAddress string, token string, destination string, body ma
 
 	var decodeMessage map[string]string
 	err = json.Unmarshal(rawResponse, &decodeMessage)
-	
 
 	return decodeMessage, nil
 }
+
+/*
 
 func BroadCast(serverAddress string, token string, dest []string, body string) error {
 
@@ -279,7 +275,7 @@ func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
 	return []string{}, nil
 }
 
-
+*/
 
 func GetComponents(serverAddress string, token string) ([]string, error) {
 
@@ -289,7 +285,7 @@ func GetComponents(serverAddress string, token string) ([]string, error) {
 	}
 	code := []byte{69}
 	tokenbyte := []byte(token)
-	message := append(code,tokenbyte...)
+	message := append(code, tokenbyte...)
 
 	conn.Write(message)
 	conn.Write([]byte("\n"))

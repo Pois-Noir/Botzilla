@@ -1,4 +1,4 @@
-package botzillaclient
+package botzilla
 
 type UserHandler interface {
 	Message(body string, sender string) (string, error)
