@@ -12,15 +12,16 @@ func (l myListener) Message(body map[string]string, _ string) (map[string]string
 
 	fmt.Println("Running command listener")
 	fmt.Println(body)
-
-	return nil, nil
+	response := map[string]string{}
+	response["darren"] = "gg"
+	return response, nil
 }
 
 func main() {
 
 	amirgay := myListener{}
 
-	token, err := botzilla.RegisterComponent("localhost:6985", "comp2", 6960, amirgay)
+	token, err := botzilla.RegisterComponent("localhost:6985", "comp", 6960, amirgay)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -35,7 +36,7 @@ func main() {
 	message := map[string]string{}
 	message["umar"] = "is gay"
 
-	res, err := botzilla.SendMessage("localhost:6985", []byte(token), "comp2", message)
+	res, err := botzilla.SendMessage("localhost:6985", []byte(token), "comp", message)
 	fmt.Println(res)
 
 }
