@@ -14,10 +14,14 @@ import (
 func RegisterComponent(serverAddress string, name string, port int, userHandler UserHandler) (string, error) {
 
 	code := []byte{0}
-	nameBytes := []byte(name)
 	var genericToken [16]byte
+	compsetting := map[string]string{}
+	compsetting["name"] = name
+	compsetting["port"] = string(port)
+	
+	encodedcompsetting, err := json.Marshal(compsetting)
 	message :=
-		append(code, nameBytes...)
+		append(code, encodedcompsetting...)
 
 	rawResponse, err := requestServer(serverAddress, message, genericToken[:])
 	if err != nil {
