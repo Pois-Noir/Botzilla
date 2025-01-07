@@ -1,6 +1,5 @@
 package botzilla
 
 type UserHandler interface {
-	Message(body string, sender string) (string, error)
-	Broadcast(body string, sender string) error
+	Message(body map[string]string, sender string) (map[string]string, error)
 }

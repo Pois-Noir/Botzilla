@@ -8,27 +8,19 @@ import (
 
 type myListener struct{}
 
-func (l myListener) Message(body string, _ string) (string, error) {
+func (l myListener) Message(body map[string]string, _ string) (map[string]string, error) {
 
 	fmt.Println("Running command listener")
 	fmt.Println(body)
 
-	return "Command Recieved", nil
-}
-
-func (l myListener) Broadcast(body string, _ string) error {
-
-	fmt.Println("Running Message Listener")
-	fmt.Println(body)
-
-	return nil
+	return nil, nil
 }
 
 func main() {
 
 	amirgay := myListener{}
 
-	token, err := botzilla.RegisterComponent("localhost:6985", "comp2", 6969, amirgay)
+	token, err := botzilla.RegisterComponent("localhost:6985", "comp2", 6960, amirgay)
 
 	if err != nil {
 		fmt.Println("There was an error running example, ", err)
@@ -39,5 +31,11 @@ func main() {
 
 	response, err := botzilla.GetComponents("localhost:6985", []byte(token))
 	fmt.Println(response)
+
+	message := map[string]string{}
+	message["umar"] = "is gay"
+
+	res, err := botzilla.SendMessage("localhost:6985", []byte(token), "comp2", message)
+	fmt.Println(res)
 
 }

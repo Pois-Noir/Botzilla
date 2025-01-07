@@ -1,8 +1,6 @@
 package botzilla
 
 import (
-	"botzilla/core"
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
@@ -39,12 +37,13 @@ func RegisterComponent(serverAddress string, name string, port int, userHandler 
 func startListener(port int, userHandler UserHandler) {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	defer listener.Close()
 
 	if err != nil {
 		fmt.Println("There was an error starting the server: \n", err)
 		return
 	}
+
+	defer listener.Close()
 
 	for {
 
@@ -61,54 +60,69 @@ func startListener(port int, userHandler UserHandler) {
 func connectionHandler(conn net.Conn, userHandler UserHandler) {
 	defer conn.Close()
 
-	// Create a buffered reader
-	reader := bufio.NewReader(conn)
+	requestHeader := [4]byte{}
 
-	// Read the entire message (this will read until it finds a newline or EOF)
-	rawMessage, err := reader.ReadBytes('\n')
-
+	_, err := conn.Read(requestHeader[:])
 	if err != nil {
-		fmt.Printf("Failed to read message: %v\n", err)
+		fmt.Println("Error reading header: \n", err)
 		return
 	}
 
-	request, err := core.Decode(rawMessage)
+	// Convert Response Header to int32
+	requestSize := int32(requestHeader[0]) |
+		int32(requestHeader[1])<<8 |
+		int32(requestHeader[2])<<16 |
+		int32(requestHeader[3])<<24
+
+	buffer := make([]byte, requestSize)
+
+	_, err = conn.Read(buffer)
+
 	if err != nil {
-		fmt.Println("go fuck yourself")
+		fmt.Printf("Error reading from connection: %v\n", err)
+		return
 	}
 
-	pt := (*request).Header["type"]
-
-	if pt == "message" {
-		response, err := userHandler.Message((*request).Body, (*request).Header["origin"])
-		if err != nil {
-			fmt.Println("error in user handler")
-			fmt.Println(err)
-			return
-		}
-		conn.Write([]byte(response))
-	} else if pt == "broadcast" {
-		err := userHandler.Broadcast((*request).Body, (*request).Header["origin"])
-		if err != nil {
-			fmt.Println("error in user handler")
-			fmt.Println(err)
-			return
-		}
+	var message map[string]string
+	err = json.Unmarshal(buffer, message)
+	if err != nil {
+		fmt.Println("Error unmarshalling message: \n", err)
+		return
 	}
+
+	response, err := userHandler.Message(message, conn.RemoteAddr().String())
+	if err != nil {
+		fmt.Println("Error processing message: \n", err)
+		return
+	}
+
+	encodedResponse, err := json.Marshal(response)
+	if err != nil {
+		fmt.Println("Error marshalling response: \n", err)
+		return
+	}
+
+	// Generate Header for server
+	messageLength := int32(len(encodedResponse))
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+		return
+	}
+
+	headerHeader := buf.Bytes()
+	conn.Write(headerHeader)
+	_, err = conn.Write(encodedResponse)
 
 }
 
 func SendMessage(serverAddress string, token []byte, destination string, body map[string]string) (map[string]string, error) {
 
 	code := []byte{2}
-	tokenBytes := []byte(token)
 	destinationBytes := []byte(destination)
 
-	message :=
-		append(
-			append(code, tokenBytes...),
-			destinationBytes...,
-		)
+	message := append(code, destinationBytes...)
 
 	rawMessage, err := requestServer(serverAddress, message, token)
 
