@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 )
 
 //Hidden Listener/Receiver for server to check if the component is live
@@ -17,11 +18,10 @@ func RegisterComponent(serverAddress string, name string, port int, userHandler 
 	var genericToken [16]byte
 	compsetting := map[string]string{}
 	compsetting["name"] = name
-	compsetting["port"] = string(port)
-	
-	encodedcompsetting, err := json.Marshal(compsetting)
-	message :=
-		append(code, encodedcompsetting...)
+	compsetting["port"] = strconv.Itoa(port)
+
+	encodedCompsetting, err := json.Marshal(compsetting)
+	message := append(code, encodedCompsetting...)
 
 	rawResponse, err := requestServer(serverAddress, message, genericToken[:])
 	if err != nil {
@@ -88,7 +88,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 	}
 
 	var message map[string]string
-	err = json.Unmarshal(buffer, message)
+	err = json.Unmarshal(buffer, &message)
 	if err != nil {
 		fmt.Println("Error unmarshalling message: \n", err)
 		return
