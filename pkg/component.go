@@ -9,36 +9,80 @@ import (
 	"strconv"
 )
 
-//Hidden Listener/Receiver for server to check if the component is live
+type Component struct {
+	Name          string
+	listenerToken []byte
+	senderToken   []byte
+	serverAddr    string
+}
 
-// Returns a token from server
-func RegisterComponent(serverAddress string, name string, port int, userHandler UserHandler) (string, error) {
+func NewComponent(ServerAddr string, name string, port int, MessageListener func(map[string]string) (map[string]string, error)) (*Component, error) {
 
 	code := []byte{0}
 	var genericToken [16]byte
-	compsetting := map[string]string{}
-	compsetting["name"] = name
-	compsetting["port"] = strconv.Itoa(port)
+	compSetting := map[string]string{}
+	compSetting["name"] = name
+	compSetting["port"] = strconv.Itoa(port)
 
-	encodedCompsetting, err := json.Marshal(compsetting)
+	encodedCompsetting, err := json.Marshal(compSetting)
 	message := append(code, encodedCompsetting...)
 
-	rawResponse, err := requestServer(serverAddress, message, genericToken[:])
+	token, err := requestServer(ServerAddr, message, genericToken[:])
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	token := string(rawResponse)
+	go startListener(port, MessageListener)
 
-	//---------------------------------------------------
-	//starting listener
-	go startListener(port, userHandler)
-
-	return token, nil
+	return &Component{Name: name, listenerToken: nil, senderToken: token, serverAddr: ServerAddr}, nil
 
 }
 
-func startListener(port int, userHandler UserHandler) {
+func (c *Component) SendMessage(name string, message map[string]string) (map[string]string, error) {
+
+	code := []byte{2}
+	destinationBytes := []byte(name)
+
+	serverMessage := append(code, destinationBytes...)
+
+	rawMessage, err := requestServer(c.serverAddr, serverMessage, c.senderToken)
+
+	destinationAddress := string(rawMessage)
+
+	encodedBody, err := json.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+
+	rawResponse, err := requestComponent(destinationAddress, encodedBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var decodeMessage map[string]string
+	err = json.Unmarshal(rawResponse, &decodeMessage)
+
+	return decodeMessage, nil
+}
+
+func (c *Component) GetComponents() ([]string, error) {
+
+	message := []byte{69}
+
+	rawResponse, err := requestServer(c.serverAddr, message, c.senderToken)
+
+	var decodeMessage []string
+	err = json.Unmarshal(rawResponse, &decodeMessage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeMessage, nil
+
+}
+
+func startListener(port int, userHandler func(map[string]string) (map[string]string, error)) {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
@@ -61,7 +105,7 @@ func startListener(port int, userHandler UserHandler) {
 	}
 }
 
-func connectionHandler(conn net.Conn, userHandler UserHandler) {
+func connectionHandler(conn net.Conn, userHandler func(map[string]string) (map[string]string, error)) {
 	defer conn.Close()
 
 	requestHeader := [4]byte{}
@@ -94,7 +138,7 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 		return
 	}
 
-	response, err := userHandler.Message(message, conn.RemoteAddr().String())
+	response, err := userHandler(message)
 	if err != nil {
 		fmt.Println("Error processing message: \n", err)
 		return
@@ -119,160 +163,6 @@ func connectionHandler(conn net.Conn, userHandler UserHandler) {
 	conn.Write(headerHeader)
 	_, err = conn.Write(encodedResponse)
 
-}
-
-func SendMessage(serverAddress string, token []byte, destination string, body map[string]string) (map[string]string, error) {
-
-	code := []byte{2}
-	destinationBytes := []byte(destination)
-
-	message := append(code, destinationBytes...)
-
-	rawMessage, err := requestServer(serverAddress, message, token)
-
-	destinationAddress := string(rawMessage)
-
-	encodedBody, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-
-	rawResponse, err := requestComponent(destinationAddress, encodedBody)
-	if err != nil {
-		return nil, err
-	}
-
-	var decodeMessage map[string]string
-	err = json.Unmarshal(rawResponse, &decodeMessage)
-
-	return decodeMessage, nil
-}
-
-/*
-
-func BroadCast(serverAddress string, token string, dest []string, body string) error {
-
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return err
-	}
-
-	message := map[string]string{
-		"body":     body,
-	}
-
-	decodedMessage, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	conn.Write(decodedMessage)
-	conn.Write([]byte("\n"))
-
-	bufferreader := bufio.NewReader(conn)
-
-	rawresponse,err := bufferreader.ReadString('\n')
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func AssignGroup(serverAddress string, token string, groupName string) error {
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return err
-	}
-
-	defer conn.Close()
-
-	message :=
-		"0001"+ groupName
-
-	conn.Write([]byte(message))
-	conn.Write([]byte("\n"))
-
-	bufferreader := bufio.NewReader(conn)
-
-	res, err := bufferreader.ReadString('\n')
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func RemoveGroup(serverAddress string, token string, groupName string) error {
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return err
-	}
-
-	defer conn.Close()
-
-	message :=
-		"0002"+ groupName
-
-	conn.Write([]byte(message))
-	conn.Write([]byte("\n"))
-
-	bufferreader := bufio.NewReader(conn)
-
-	res, err := bufferreader.ReadString('\n')
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func GetAssignedGroups(serverAddress string, token string) ([]string, error) {
-
-	conn, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		return nil,err
-	}
-
-	defer conn.Close()
-
-	message :=
-		"0003"
-
-	conn.Write([]byte(message))
-	conn.Write([]byte("\n"))
-
-	bufferreader := bufio.NewReader(conn)
-	groups:= [] string{}
-	groups, err = bufferreader.ReadString('\n')
-
-	if err != nil {
-		return nil,err
-	}
-
-
-	return []string{}, nil
-}
-
-*/
-
-func GetComponents(serverAddress string, token []byte) ([]string, error) {
-
-	message := []byte{69}
-
-	rawResponse, err := requestServer(serverAddress, message, token)
-
-	var decodeMessage []string
-	err = json.Unmarshal(rawResponse, &decodeMessage)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return decodeMessage, nil
 }
 
 func requestServer(serverAddress string, message []byte, token []byte) ([]byte, error) {
@@ -319,7 +209,6 @@ func requestServer(serverAddress string, message []byte, token []byte) ([]byte, 
 	}
 
 	return buffer, nil
-
 }
 
 func requestComponent(componentAddress string, message []byte) ([]byte, error) {

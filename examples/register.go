@@ -3,12 +3,11 @@ package main
 import (
 	botzilla "botzilla/pkg"
 	"fmt"
-	"os"
 )
 
 type myListener struct{}
 
-func (l myListener) Message(body map[string]string, _ string) (map[string]string, error) {
+func Message(body map[string]string) (map[string]string, error) {
 
 	fmt.Println("Running command listener")
 	fmt.Println(body)
@@ -19,24 +18,20 @@ func (l myListener) Message(body map[string]string, _ string) (map[string]string
 
 func main() {
 
-	amirgay := myListener{}
-
-	token, err := botzilla.RegisterComponent("localhost:6985", "comp", 6960, amirgay)
-
+	compA, err := botzilla.NewComponent("localhost:6985", "comp1", 6960, Message)
 	if err != nil {
-		fmt.Println("There was an error running example, ", err)
-		os.Exit(1)
 	}
 
-	println(token)
+	compB, err := botzilla.NewComponent("localhost:6985", "comp2", 6942, Message)
 
-	response, err := botzilla.GetComponents("localhost:6985", []byte(token))
+	fmt.Println(compA.GetComponents())
+
+	m := map[string]string{}
+	m["data"] = "a request from comp1 to comp2"
+	response, err := compB.SendMessage("comp1", m)
+	if err != nil {
+	}
+
 	fmt.Println(response)
-
-	message := map[string]string{}
-	message["umar"] = "is gay"
-
-	res, err := botzilla.SendMessage("localhost:6985", []byte(token), "comp", message)
-	fmt.Println(res)
 
 }
