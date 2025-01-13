@@ -1,152 +1,80 @@
-# Botzilla Client
+# Botzilla
 
-`botzillaclient` is a library designed to facilitate communication with Botzilla. For more information about Botzilla itself, refer to the official documentation: Botzilla Documentation.
+`Botzilla` is a lightweight library designed for seamless communication between nodes, optimized for minimal overhead and simplicity.
 
-`Note`: botzillaclient requires Botzilla to be actively running on the network to function properly.
+**Note:** To operate correctly, `Botzilla` requires the `Botzilla-Server` to be running on the network.
+
+# Network Architecture
+Botzilla revolves around the concept of **components**. Each component registers itself with the Botzilla server, using a unique name. Components can be grouped together, and multiple components can be instantiated within the same codebase.
+
+The Botzilla server primarily serves as a discovery system; all messages are sent directly from one component to another without any intermediary, ensuring efficient and direct communication.
+
+# Comminucation Types
+## Message
+A typical point-to-point (P2P) message exchange involves a request and a response. For usage, refer to the example provided in `register.go`.
+
+## Broadcast
+The broadcast function allows a message to be sent to all registered components on the network. If any components are not set up to listen for broadcasts, they will simply ignore the message.
+
+# Security
+To secure incoming messages, **HMAC** (Hash-based Message Authentication Code) with a shared secret key is used. This ensures the integrity and authenticity of the messages.
+
+**Note:** The messages themselves are not encrypted, meaning that while HMAC ensures authenticity, the content of the messages could still be exposed if intercepted. Encryption for message content is planned for future releases.
 
 # Functions
 
 ```
-Start(name string, port string) error
+NewComponent(ServerAddr, secretKey, name, port, MessageListener) (Component, error)
 ```
-- `Description`: Establishes a connection to the Botzilla server.
 
-- `Parameters`:
-	- `name`: A unique identifier for each component connecting to the server.
+**Parameters:**
 
-	- `port`: The TCP port on which the server will listen.
+- `ServerAddr:` A string representing the address where the Botzilla server is running (including the port), e.g., "localhost:8080".
 
-- `Returns`: An error if the connection fails, otherwise nil.
+- `secretKey:` The shared secret key known to all components and the server. **Do not send this via the protocol.**
 
-- `Usage`: This function must be called by every component that wishes to connect to the Botzilla server. It opens a TCP server on the specified port.
+- `name:` A unique name for the component.
 
-<br />
+- `port:` The TCP port to listen on.
 
-```
-SendCommand(follower string, body string) (string, error)
-```
-- `Description`: Sends a command to a specified follower and waits for a response.
-
-- `Parameters`:
-	- `follower`: The unique identifier of the follower to which the command is being sent.
-
-	- `body`: The body of the command to send.
-- `Returns`: The response from the follower and any potential error.
-
-- `Usage`: This function is used to send commands to a specific follower and receive their responses. It is designed to handle one-way communication from the sender to the follower.
+- `MessageListener:` A function to handle incoming messages (see examples for how to define it).
 
 
 <br />
 
 ```
-BroadcastMessage(followers []string, body string) error
+SendMessage(name string, body map[string]string) (map[string]string, error)
 ```
-- `Description`: Sends a message to multiple followers.
+- `Description`: Sends a message to a specified component and waits for a response.
 
 - `Parameters`:
-	- `followers`: A list of follower identifiers to which the message will be sent.
+	- `name`: The unique identifier of the component to which the message is being sent.
 
+	- `body`: The content of the message to send.
+- `Returns`:  A response from the recipient component and any potential errors.
+
+
+<br />
+
+```
+BroadcastMessage(message map[string]string) error
+```
+- `Description`: Sends a broadcast to all components registered in server.
+
+- `Parameters`:
 	- `body`: The body of the message.
 - `Returns`: An error if the message could not be delivered to any of the followers.
-- `Usage`: This function broadcasts a message to multiple followers. It is useful for sending the same message to a group of followers.
 
 <br />
 
-## Receiving Commands and Messages
-
-`CommandListener`
-
-To handle incoming commands, you must implement the CommandListener interface:
-
 ```
-type CommandListener interface {
-	OnReceive(body string) (string, error)
-}
+GetComponents()
 ```
-- `Description`: This interface is used to process incoming commands. The OnReceive function is invoked each time a new command is received.
+- `Returns`: An array of registered components by their names
 
-- `Returns`: When a command is received and processed via the CommandListener, the return value of the OnReceive function is automatically sent back to the sender.
 
-- `Execution`: OnReceive is executed in a new goroutine for each incoming command, allowing for concurrent handling of multiple commands.
+# Road Map
 
-<br />
-
-`MessageListener`
-
-To handle incoming messages, you must implement the MessageListener interface:
-
-```
-type MessageListener interface {
-	OnReceive(body string)
-}
-```
-- `Description`: This interface is used to process incoming messages. The OnReceive function is invoked each time a new message is received.
-
-- `Execution`: OnReceive is executed in a new goroutine for each incoming message.
-
-### Setting Up Listeners
-Once you've implemented the required interfaces, you can register listeners for commands and messages using the following functions:
-
-`Start Command Listener`
-```
-func StartCommandListener( listener CommandListener )
-```
-
-<br />
-
-`Start Message Listener`
-```
-func StartMessageListener( listener MessageListener )
-```
-
-## Example Usage
-```
-// Define a command listener
-type MyCommandListener struct{}
-
-func (m *MyCommandListener) OnReceive(body string) (string, error) {
-    // Process the command
-    return "Command processed", nil
-}
-
-// Define a message listener
-type MyMessageListener struct{}
-
-func (m *MyMessageListener) OnReceive(body string) error {
-    // Process the message
-    fmt.Println("Received message:", body)
-    return nil
-}
-
-func main() {
-    // Start the server
-    err := Start("MyComponent", "8080")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Register listeners
-    err = RegisterCommandListener(&MyCommandListener{})
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    err = RegisterMessageListener(&MyMessageListener{})
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Send a command to a follower
-    response, err := SendCommand("Follower1", "Some command")
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Println("Received response:", response)
-
-    // Broadcast a message to multiple followers
-    err = BroadcastMessage([]string{"Follower1", "Follower2"}, "Hello followers!")
-    if err != nil {
-        log.Fatal(err)
-    }
-}
-```
+- Streams / Realtime Comminucation
+- C/C++/Java/C# bindings
+- encrypted messages
