@@ -38,7 +38,7 @@ func NewComponent(ServerAddr string, secretKey string, name string, port int, Me
 		return nil, errors.New(string(response))
 	}
 
-	go startListener(port, MessageListener)
+	go startListener(port, secretKey, MessageListener)
 
 	return &Component{Name: name, key: []byte(secretKey), serverAddr: ServerAddr}, nil
 
@@ -106,7 +106,7 @@ func verifyHMAC(data []byte, key []byte, hash []byte) bool {
 	return subtle.ConstantTimeCompare(generatedHMAC, hash) == 1
 }
 
-func startListener(port int, userHandler func(map[string]string) (map[string]string, error)) {
+func startListener(port int, key string, userHandler func(map[string]string) (map[string]string, error)) {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
@@ -125,11 +125,11 @@ func startListener(port int, userHandler func(map[string]string) (map[string]str
 			continue
 		}
 
-		go connectionHandler(conn, userHandler)
+		go connectionHandler(conn, key, userHandler)
 	}
 }
 
-func connectionHandler(conn net.Conn, userHandler func(map[string]string) (map[string]string, error)) {
+func connectionHandler(conn net.Conn, key string, userHandler func(map[string]string) (map[string]string, error)) {
 	defer conn.Close()
 
 	requestHeader := [4]byte{}
@@ -158,8 +158,8 @@ func connectionHandler(conn net.Conn, userHandler func(map[string]string) (map[s
 		return
 	}
 
-	is_valid := verifyHMAC(buffer, hash[:], requestHeader[:])
-	if !is_valid {
+	isValid := verifyHMAC(buffer, []byte(key), hash[:])
+	if !isValid {
 		return
 	}
 
