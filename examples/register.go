@@ -16,11 +16,11 @@ func Message(body map[string]string) (map[string]string, error) {
 
 func main() {
 
-	compA, err := botzilla.NewComponent("localhost:6985", "comp1", 6960, Message)
+	compA, err := botzilla.NewComponent("localhost:6985", "ppap", "comp1", 6960, Message)
 	if err != nil {
 	}
 
-	compB, err := botzilla.NewComponent("localhost:6985", "comp2", 6942, Message)
+	compB, err := botzilla.NewComponent("localhost:6985", "ppap", "comp2", 6942, Message)
 
 	fmt.Println(compA.GetComponents())
 
