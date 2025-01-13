@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -97,6 +98,14 @@ func generateHMAC(data []byte, key []byte) []byte {
 	return mac.Sum(nil)
 }
 
+func verifyHMAC(data []byte, key []byte, hash []byte) bool {
+	// Generate HMAC for the provided data using the same key
+	generatedHMAC := generateHMAC(data, key)
+
+	// Use subtle.ConstantTimeCompare to securely compare the two HMACs
+	return subtle.ConstantTimeCompare(generatedHMAC, hash) == 1
+}
+
 func startListener(port int, userHandler func(map[string]string) (map[string]string, error)) {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
@@ -141,8 +150,16 @@ func connectionHandler(conn net.Conn, userHandler func(map[string]string) (map[s
 
 	_, err = conn.Read(buffer)
 
+	hash := [32]byte{}
+	_, err = conn.Read(hash[:])
+
 	if err != nil {
 		fmt.Printf("Error reading from connection: %v\n", err)
+		return
+	}
+
+	is_valid := verifyHMAC(buffer, hash[:], requestHeader[:])
+	if !is_valid {
 		return
 	}
 
@@ -175,8 +192,12 @@ func connectionHandler(conn net.Conn, userHandler func(map[string]string) (map[s
 	}
 
 	headerHeader := buf.Bytes()
-	conn.Write(headerHeader)
+	_, err = conn.Write(headerHeader)
 	_, err = conn.Write(encodedResponse)
+
+	if err != nil {
+		fmt.Println("Error sending response: \n", err)
+	}
 
 }
 
@@ -203,12 +224,19 @@ func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 	header := buf.Bytes()
 
 	// Send token for auth
-	conn.Write(header)
-	conn.Write(message)
-	conn.Write(hash)
+	_, err = conn.Write(header)
+	_, err = conn.Write(message)
+	_, err = conn.Write(hash)
+
+	if err != nil {
+		return nil, err
+	}
 
 	responseHeader := [4]byte{}
-	conn.Read(responseHeader[:])
+	_, err = conn.Read(responseHeader[:])
+	if err != nil {
+		return nil, err
+	}
 
 	// Convert Response Header to int32
 	responseSize := int32(responseHeader[0]) |
