@@ -2,24 +2,25 @@ package botzilla
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
 )
 
 type Component struct {
-	Name          string
-	listenerToken []byte
-	senderToken   []byte
-	serverAddr    string
+	Name       string
+	serverAddr string
+	key        []byte
 }
 
-func NewComponent(ServerAddr string, name string, port int, MessageListener func(map[string]string) (map[string]string, error)) (*Component, error) {
+func NewComponent(ServerAddr string, secretKey string, name string, port int, MessageListener func(map[string]string) (map[string]string, error)) (*Component, error) {
 
 	code := []byte{0}
-	var genericToken [16]byte
 	compSetting := map[string]string{}
 	compSetting["name"] = name
 	compSetting["port"] = strconv.Itoa(port)
@@ -27,14 +28,18 @@ func NewComponent(ServerAddr string, name string, port int, MessageListener func
 	encodedCompsetting, err := json.Marshal(compSetting)
 	message := append(code, encodedCompsetting...)
 
-	token, err := requestServer(ServerAddr, message, genericToken[:])
+	response, err := request(ServerAddr, message, []byte(secretKey))
 	if err != nil {
 		return nil, err
 	}
 
+	if string(response) != "registered" {
+		return nil, errors.New(string(response))
+	}
+
 	go startListener(port, MessageListener)
 
-	return &Component{Name: name, listenerToken: nil, senderToken: token, serverAddr: ServerAddr}, nil
+	return &Component{Name: name, key: []byte(secretKey), serverAddr: ServerAddr}, nil
 
 }
 
@@ -45,7 +50,7 @@ func (c *Component) SendMessage(name string, message map[string]string) (map[str
 
 	serverMessage := append(code, destinationBytes...)
 
-	rawMessage, err := requestServer(c.serverAddr, serverMessage, c.senderToken)
+	rawMessage, err := request(c.serverAddr, serverMessage, c.key)
 
 	destinationAddress := string(rawMessage)
 
@@ -54,7 +59,7 @@ func (c *Component) SendMessage(name string, message map[string]string) (map[str
 		return nil, err
 	}
 
-	rawResponse, err := requestComponent(destinationAddress, encodedBody)
+	rawResponse, err := request(destinationAddress, encodedBody, c.key)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +74,7 @@ func (c *Component) GetComponents() ([]string, error) {
 
 	message := []byte{69}
 
-	rawResponse, err := requestServer(c.serverAddr, message, c.senderToken)
+	rawResponse, err := request(c.serverAddr, message, c.key)
 
 	var decodeMessage []string
 	err = json.Unmarshal(rawResponse, &decodeMessage)
@@ -80,6 +85,16 @@ func (c *Component) GetComponents() ([]string, error) {
 
 	return decodeMessage, nil
 
+}
+
+func (c *Component) Broadcast(message map[string]string) error {
+	return nil
+}
+
+func generateHMAC(data []byte, key []byte) []byte {
+	mac := hmac.New(sha256.New, key) // 32 bytes
+	mac.Write(data)
+	return mac.Sum(nil)
 }
 
 func startListener(port int, userHandler func(map[string]string) (map[string]string, error)) {
@@ -165,7 +180,7 @@ func connectionHandler(conn net.Conn, userHandler func(map[string]string) (map[s
 
 }
 
-func requestServer(serverAddress string, message []byte, token []byte) ([]byte, error) {
+func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
@@ -183,12 +198,14 @@ func requestServer(serverAddress string, message []byte, token []byte) ([]byte, 
 		return nil, err
 	}
 
+	hash := generateHMAC(message, key)
+
 	header := buf.Bytes()
 
 	// Send token for auth
-	conn.Write(token)
 	conn.Write(header)
 	conn.Write(message)
+	conn.Write(hash)
 
 	responseHeader := [4]byte{}
 	conn.Read(responseHeader[:])
@@ -209,47 +226,4 @@ func requestServer(serverAddress string, message []byte, token []byte) ([]byte, 
 	}
 
 	return buffer, nil
-}
-
-func requestComponent(componentAddress string, message []byte) ([]byte, error) {
-
-	conn, err := net.Dial("tcp", componentAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	defer conn.Close()
-
-	// Generate Header
-	messageLength := int32(len(message))
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
-	if err != nil {
-		fmt.Println("binary.Write failed:", err)
-		return nil, err
-	}
-
-	// Send Header
-	conn.Write(buf.Bytes())
-	conn.Write(message)
-
-	responseHeader := [4]byte{}
-	conn.Read(responseHeader[:])
-
-	// Convert Response Header to int32
-	responseSize := int32(responseHeader[0]) |
-		int32(responseHeader[1])<<8 |
-		int32(responseHeader[2])<<16 |
-		int32(responseHeader[3])<<24
-
-	buffer := make([]byte, responseSize)
-
-	_, err = conn.Read(buffer)
-	if err != nil {
-		fmt.Printf("Error reading from connection: %v\n", err)
-		return nil, err
-	}
-
-	return buffer, nil
-
 }

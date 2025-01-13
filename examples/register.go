@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-type myListener struct{}
-
 func Message(body map[string]string) (map[string]string, error) {
 
 	fmt.Println("Running command listener")
