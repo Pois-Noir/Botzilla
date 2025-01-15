@@ -32,4 +32,6 @@ func main() {
 
 	fmt.Println(response)
 
+	compA.Broadcast(m)
+
 }

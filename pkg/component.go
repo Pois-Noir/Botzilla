@@ -89,6 +89,16 @@ func (c *Component) GetComponents() ([]string, error) {
 }
 
 func (c *Component) Broadcast(message map[string]string) error {
+
+	arr, err := c.GetComponents()
+	if err != nil {
+		return err
+	}
+
+	for _, comp := range arr {
+		go c.SendMessage(comp, message)
+	}
+
 	return nil
 }
 
