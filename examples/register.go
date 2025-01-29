@@ -1,8 +1,8 @@
 package main
 
 import (
-	botzilla "botzilla/pkg"
 	"fmt"
+	botzilla "github.com/Pois-Noir/Botzilla/pkg"
 )
 
 func Message(body map[string]string) (map[string]string, error) {
