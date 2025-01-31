@@ -67,13 +67,26 @@ func (c *Component) SendMessage(name string, message map[string]string) (map[str
 		return nil, err
 	}
 
-	rawResponse, err := request(destinationAddress, encodedBody, c.key)
+	encryptedMessage, err := encrypt(encodedBody, c.key)
+	if err != nil {
+		return nil, err
+	}
+
+	rawResponse, err := request(destinationAddress, encryptedMessage, c.key)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedMessage, err := decrypt(rawResponse, c.key)
 	if err != nil {
 		return nil, err
 	}
 
 	var decodeMessage map[string]string
-	err = json.Unmarshal(rawResponse, &decodeMessage)
+	err = json.Unmarshal(decryptedMessage, &decodeMessage)
+	if err != nil {
+		return nil, err
+	}
 
 	return decodeMessage, nil
 }
