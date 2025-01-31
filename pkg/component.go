@@ -2,13 +2,20 @@ package botzilla
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	_ "crypto/cipher"
 	"crypto/hmac"
+	"crypto/rand"
+	_ "crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	_ "io"
 	"net"
 	"strconv"
 )
@@ -264,4 +271,44 @@ func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 	}
 
 	return buffer, nil
+}
+
+// encryption via AES between communication networks
+
+func encrypt(plaindata []byte, key []byte) ([]byte, error) { // encrypt the plain text using AES
+	block, err := aes.NewCipher(key)
+
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext := make([]byte, aes.BlockSize+len(plaindata))
+	iv := ciphertext[:aes.BlockSize]
+
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	stream := cipher.NewCFBEncrypter(block, iv)
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaindata)
+
+	return ciphertext, nil
+}
+
+func decrypt(ciphertext []byte, key []byte) ([]byte, error) { // decrypt ciphertext using AES
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ciphertext) < aes.BlockSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+	stream := cipher.NewCFBDecrypter(block, iv)
+	stream.XORKeyStream(ciphertext, ciphertext)
+
+	return ciphertext, nil
 }
