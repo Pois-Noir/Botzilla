@@ -59,6 +59,9 @@ func (c *Component) SendMessage(name string, message map[string]string) (map[str
 	serverMessage := append(code, destinationBytes...)
 
 	rawMessage, err := request(c.serverAddr, serverMessage, c.key)
+	if err != nil {
+		return nil, err
+	}
 
 	destinationAddress := string(rawMessage)
 
@@ -74,6 +77,9 @@ func (c *Component) SendMessage(name string, message map[string]string) (map[str
 
 	var decodeMessage map[string]string
 	err = json.Unmarshal(rawResponse, &decodeMessage)
+	if err != nil {
+		return nil, err
+	}
 
 	return decodeMessage, nil
 }
@@ -295,6 +301,16 @@ func encrypt(plaindata []byte, key []byte) ([]byte, error) { // encrypt the plai
 	return ciphertext, nil
 }
 
+// encrypts a map into an encrypted byte slice.
+func EncryptMap(data map[string]string, key []byte) ([]byte, error) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return encrypt(jsonData, key)
+}
+
 func decrypt(ciphertext []byte, key []byte) ([]byte, error) { // decrypt ciphertext using AES
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -311,4 +327,20 @@ func decrypt(ciphertext []byte, key []byte) ([]byte, error) { // decrypt ciphert
 	stream.XORKeyStream(ciphertext, ciphertext)
 
 	return ciphertext, nil
+}
+
+func DecryptMap(encryptedData []byte, key []byte) (map[string]string, error) {
+
+	decryptedData, err := decrypt(encryptedData, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]string
+	err = json.Unmarshal(decryptedData, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
