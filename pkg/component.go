@@ -94,19 +94,19 @@ func (c *Component) GetComponents() ([]string, error) {
 
 }
 
-func (c *Component) Broadcast(message map[string]string) error {
+// func (c *Component) Broadcast(message map[string]string) error {
 
-	arr, err := c.GetComponents()
-	if err != nil {
-		return err
-	}
+// 	arr, err := c.GetComponents()
+// 	if err != nil {
+// 		return err
+// 	}
 
-	for _, comp := range arr {
-		go c.SendMessage(comp, message)
-	}
+// 	for _, comp := range arr {
+// 		go c.SendMessage(comp, message)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func generateHMAC(data []byte, key []byte) []byte {
 	mac := hmac.New(sha256.New, key) // 32 bytes
