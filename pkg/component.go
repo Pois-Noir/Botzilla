@@ -15,6 +15,7 @@ import (
 
 type Component struct {
 	Name       string
+	tunnels    []*Tunnel
 	serverAddr string
 	key        []byte
 }
@@ -91,6 +92,32 @@ func (c *Component) GetComponents() ([]string, error) {
 	}
 
 	return decodeMessage, nil
+
+}
+
+func (c *Component) StartStream(name string, port int) error {
+	operationCode := []byte{29}
+	requestContent := map[string]string{}
+
+	requestContent["name"] = c.Name + "_" + name
+	requestContent["port"] = string(port)
+
+	encodedRequestContent, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	encodedRequestContent = append(operationCode, encodedRequestContent...)
+	_, err = request(c.serverAddr, encodedRequestContent, c.key)
+
+	if err != nil {
+		return err
+	}
+
+	return err
+
+	// TODO!!!
+	// Check for response if it was really added
 
 }
 
