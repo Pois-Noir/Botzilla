@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	botzilla "github.com/Pois-Noir/Botzilla/pkg"
 )
 
@@ -31,7 +32,5 @@ func main() {
 	}
 
 	fmt.Println(response)
-
-	compA.Broadcast(m)
 
 }

@@ -15,7 +15,7 @@ import (
 
 type Component struct {
 	Name       string
-	tunnels    []*Tunnel
+	tunnels    []*tunnel
 	serverAddr string
 	key        []byte
 }
@@ -95,12 +95,14 @@ func (c *Component) GetComponents() ([]string, error) {
 
 }
 
-func (c *Component) StartStream(name string, port int) error {
+func (c *Component) StartStream(name string, input chan byte, port int) error {
 	operationCode := []byte{29}
 	requestContent := map[string]string{}
 
-	requestContent["name"] = c.Name + "_" + name
-	requestContent["port"] = string(port)
+	t_name := c.Name + "_" + name
+
+	requestContent["name"] = t_name
+	requestContent["port"] = strconv.Itoa(port)
 
 	encodedRequestContent, err := json.Marshal(request)
 	if err != nil {
@@ -114,26 +116,16 @@ func (c *Component) StartStream(name string, port int) error {
 		return err
 	}
 
+	new_tunnel := newTunnel(t_name, input, port)
+
+	go new_tunnel.start()
+
 	return err
 
 	// TODO!!!
 	// Check for response if it was really added
 
 }
-
-// func (c *Component) Broadcast(message map[string]string) error {
-
-// 	arr, err := c.GetComponents()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	for _, comp := range arr {
-// 		go c.SendMessage(comp, message)
-// 	}
-
-// 	return nil
-// }
 
 func generateHMAC(data []byte, key []byte) []byte {
 	mac := hmac.New(sha256.New, key) // 32 bytes
@@ -149,13 +141,13 @@ func verifyHMAC(data []byte, key []byte, hash []byte) bool {
 	return subtle.ConstantTimeCompare(generatedHMAC, hash) == 1
 }
 
-func startListener(port int, key string, userHandler func(map[string]string) (map[string]string, error)) {
+func startListener(port int, key string, userHandler func(map[string]string) (map[string]string, error)) error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
 	if err != nil {
 		fmt.Println("There was an error starting the server: \n", err)
-		return
+		return err
 	}
 
 	defer listener.Close()
