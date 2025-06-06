@@ -11,7 +11,7 @@ import (
 type tunnel struct {
 	Name     string
 	source   chan byte
-	channels *Ren.SafeList[net.Addr, chan byte]
+	channels *Ren.SafeMap[net.Addr, chan byte]
 	mu       sync.Mutex
 	port     int
 	Stop     bool
