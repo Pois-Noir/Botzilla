@@ -14,117 +14,156 @@ import (
 )
 
 type Component struct {
-	Name       string
-	tunnels    []*tunnel
-	serverAddr string
-	key        []byte
+	Name           string
+	MessageHandler func(map[string]string) (map[string]string, error)
+	tunnels        []*tunnel
+	serverAddr     string
+	key            []byte
 }
 
-func NewComponent(ServerAddr string, secretKey string, name string, port int, MessageListener func(map[string]string) (map[string]string, error)) (*Component, error) {
+func NewComponent(ServerAddr string, secretKey string, name string, port int) (*Component, error) {
 
-	code := []byte{0}
+	// Generate request content to server
 	compSetting := map[string]string{}
 	compSetting["name"] = name
 	compSetting["port"] = strconv.Itoa(port)
-
 	encodedCompsetting, err := json.Marshal(compSetting)
-	message := append(code, encodedCompsetting...)
 
+	// Operation code 0 is for registration
+	operationCode := []byte{0}
+	message := append(operationCode, encodedCompsetting...)
+
+	// send request to server
 	response, err := request(ServerAddr, message, []byte(secretKey))
+
+	// check response from server
 	if err != nil {
 		return nil, err
 	}
-
 	if string(response) != "registered" {
 		return nil, errors.New(string(response))
 	}
 
-	go startListener(port, secretKey, MessageListener)
+	// generate component with empty message handler
+	comp := &Component{
+		Name:           name,
+		MessageHandler: func(m map[string]string) (map[string]string, error) { return make(map[string]string), nil },
+		key:            []byte(secretKey),
+		serverAddr:     ServerAddr,
+		tunnels:        make([]*tunnel, 0),
+	}
 
-	return &Component{Name: name, key: []byte(secretKey), serverAddr: ServerAddr}, nil
+	// run tcp listener
+	go comp.startListener(port, secretKey)
+
+	return comp, nil
 
 }
 
-func (c *Component) SendMessage(name string, message map[string]string) (map[string]string, error) {
+func (c *Component) startListener(port int, key string) error {
 
-	code := []byte{2}
-	destinationBytes := []byte(name)
+	// start tcp listener
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		fmt.Println("There was an error starting the server: \n", err)
+		return err
+	}
+	defer listener.Close()
 
-	serverMessage := append(code, destinationBytes...)
+	for {
 
-	rawMessage, err := request(c.serverAddr, serverMessage, c.key)
+		// for each connection add a goroutine
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: \n", err)
+			continue
+		}
+		go connectionHandler(conn, key, c.MessageHandler)
+	}
+}
+
+func (c *Component) SendMessage(componentName string, message map[string]string) (map[string]string, error) {
+
+	// Generate request content to server
+	destinationBytes := []byte(componentName)
+
+	// Operation code 2 is for Get Component
+	operationCode := []byte{2}
+	serverMessage := append(operationCode, destinationBytes...)
+
+	// send request to server
+	rawServerResponse, err := request(c.serverAddr, serverMessage, c.key)
 	if err != nil {
 		return nil, err
 	}
 
-	destinationAddress := string(rawMessage)
+	// TODO!!!
+	// Server response has to be checked
 
+	// Parsing server response to tcp address
+	destinationAddress := string(rawServerResponse)
+
+	// Encoding message content
 	encodedBody, err := json.Marshal(message)
 	if err != nil {
 		return nil, err
 	}
 
-	rawResponse, err := request(destinationAddress, encodedBody, c.key)
+	// send request to other component
+	rawComponentResponse, err := request(destinationAddress, encodedBody, c.key)
 	if err != nil {
 		return nil, err
 	}
 
-	var decodeMessage map[string]string
-	err = json.Unmarshal(rawResponse, &decodeMessage)
+	// parse component response
+	var componentResponse map[string]string
+	err = json.Unmarshal(rawComponentResponse, &componentResponse)
 	if err != nil {
 		return nil, err
 	}
 
-	return decodeMessage, nil
+	return componentResponse, nil
 }
 
 func (c *Component) GetComponents() ([]string, error) {
 
-	message := []byte{69}
+	// Operation code 2 is for Get All Component
+	operationCode := []byte{69}
 
-	rawResponse, err := request(c.serverAddr, message, c.key)
+	// send request to server
+	rawServerResponse, err := request(c.serverAddr, operationCode, c.key)
 
-	var decodeMessage []string
-	err = json.Unmarshal(rawResponse, &decodeMessage)
-
+	// parse server response
+	var serverResponse []string
+	err = json.Unmarshal(rawServerResponse, &serverResponse)
 	if err != nil {
 		return nil, err
 	}
 
-	return decodeMessage, nil
+	return serverResponse, nil
 
 }
 
-func (c *Component) StartStream(name string, input chan byte, port int) error {
-	operationCode := []byte{29}
-	requestContent := map[string]string{}
+// TODO
+func (c *Component) StartStream(streamName string, input chan byte, port int) error {
 
-	t_name := c.Name + "_" + name
+	new_tunnel := newTunnel(streamName, input, port)
 
-	requestContent["name"] = t_name
-	requestContent["port"] = strconv.Itoa(port)
-
-	encodedRequestContent, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
-
-	encodedRequestContent = append(operationCode, encodedRequestContent...)
-	_, err = request(c.serverAddr, encodedRequestContent, c.key)
-
-	if err != nil {
-		return err
-	}
-
-	new_tunnel := newTunnel(t_name, input, port)
+	c.tunnels = append(c.tunnels, new_tunnel)
 
 	go new_tunnel.start()
 
-	return err
+	return nil
+}
 
-	// TODO!!!
-	// Check for response if it was really added
+// TODO
+func (c *Component) GetComponentStreams(componentName string) error {
+	return nil
+}
 
+// TODO
+func (c *Component) SubscribeStream(componentName string, streamName string) error {
+	return nil
 }
 
 func generateHMAC(data []byte, key []byte) []byte {
@@ -141,71 +180,49 @@ func verifyHMAC(data []byte, key []byte, hash []byte) bool {
 	return subtle.ConstantTimeCompare(generatedHMAC, hash) == 1
 }
 
-func startListener(port int, key string, userHandler func(map[string]string) (map[string]string, error)) error {
-
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-
-	if err != nil {
-		fmt.Println("There was an error starting the server: \n", err)
-		return err
-	}
-
-	defer listener.Close()
-
-	for {
-
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection: \n", err)
-			continue
-		}
-
-		go connectionHandler(conn, key, userHandler)
-	}
-}
-
-func connectionHandler(conn net.Conn, key string, userHandler func(map[string]string) (map[string]string, error)) {
+func connectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
 	defer conn.Close()
 
+	// Reading request header ( indicates request size )
 	requestHeader := [4]byte{}
-
 	_, err := conn.Read(requestHeader[:])
 	if err != nil {
 		fmt.Println("Error reading header: \n", err)
 		return
 	}
-
-	// Convert Response Header to int32
-	requestSize := int32(requestHeader[0]) |
+	requestSize := int32(requestHeader[0]) | // Convert Response Header to int32
 		int32(requestHeader[1])<<8 |
 		int32(requestHeader[2])<<16 |
 		int32(requestHeader[3])<<24
 
-	buffer := make([]byte, requestSize)
+	// reading request
+	rawRequest := make([]byte, requestSize)
+	_, err = conn.Read(rawRequest)
 
-	_, err = conn.Read(buffer)
-
+	// reading request hash
 	hash := [32]byte{}
 	_, err = conn.Read(hash[:])
-
 	if err != nil {
 		fmt.Printf("Error reading from connection: %v\n", err)
 		return
 	}
 
-	isValid := verifyHMAC(buffer, []byte(key), hash[:])
+	// verifying the hash
+	isValid := verifyHMAC(rawRequest, []byte(key), hash[:])
 	if !isValid {
 		return
 	}
 
-	var message map[string]string
-	err = json.Unmarshal(buffer, &message)
+	// parsing request
+	var request map[string]string
+	err = json.Unmarshal(rawRequest, &request)
 	if err != nil {
 		fmt.Println("Error unmarshalling message: \n", err)
 		return
 	}
 
-	response, err := userHandler(message)
+	// run the users callback
+	response, err := MessageHandler(request)
 	if err != nil {
 		fmt.Println("Error processing message: \n", err)
 		return
@@ -218,16 +235,16 @@ func connectionHandler(conn net.Conn, key string, userHandler func(map[string]st
 	}
 
 	// Generate Header for server
-	messageLength := int32(len(encodedResponse))
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
+	ResponseLenght := int32(len(encodedResponse))
+	RawResponseHeader := new(bytes.Buffer)
+	err = binary.Write(RawResponseHeader, binary.LittleEndian, ResponseLenght) // LittleEndian like umar
 	if err != nil {
 		fmt.Println("binary.Write failed:", err)
 		return
 	}
 
-	headerHeader := buf.Bytes()
-	_, err = conn.Write(headerHeader)
+	ResponseHeader := RawResponseHeader.Bytes()
+	_, err = conn.Write(ResponseHeader)
 	_, err = conn.Write(encodedResponse)
 
 	if err != nil {
@@ -238,14 +255,14 @@ func connectionHandler(conn net.Conn, key string, userHandler func(map[string]st
 
 func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 
+	// start tcp call
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		return nil, err
 	}
-
 	defer conn.Close()
 
-	// Generate Header for server
+	// Generate Header
 	messageLength := int32(len(message))
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
@@ -253,40 +270,43 @@ func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 		fmt.Println("binary.Write failed:", err)
 		return nil, err
 	}
-
-	hash := generateHMAC(message, key)
-
 	header := buf.Bytes()
+
+	// Generate Hash
+	hash := generateHMAC(message, key)
 
 	// Send token for auth
 	_, err = conn.Write(header)
 	_, err = conn.Write(message)
 	_, err = conn.Write(hash)
 
+	// TODO
+	// Might need better error handling here
 	if err != nil {
 		return nil, err
 	}
 
+	// Reading Response Header (indicates response size)
 	responseHeader := [4]byte{}
 	_, err = conn.Read(responseHeader[:])
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert Response Header to int32
+	// Parsing Header
 	responseSize := int32(responseHeader[0]) |
 		int32(responseHeader[1])<<8 |
 		int32(responseHeader[2])<<16 |
 		int32(responseHeader[3])<<24
 
-	buffer := make([]byte, responseSize)
-
-	_, err = conn.Read(buffer)
+	// Reading Response
+	rawResponse := make([]byte, responseSize)
+	_, err = conn.Read(rawResponse)
 
 	if err != nil {
 		fmt.Printf("Error reading from connection: %v\n", err)
 		return nil, err
 	}
 
-	return buffer, nil
+	return rawResponse, nil
 }
