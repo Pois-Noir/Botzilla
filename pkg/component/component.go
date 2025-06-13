@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/Pois-Noir/Botzilla/pkg/core"
 )
 
 type Component struct {
@@ -32,7 +34,7 @@ func NewComponent(ServerAddr string, secretKey string, name string, port int) (*
 	message := append(operationCode, encodedCompsetting...)
 
 	// send request to server
-	response, err := request(ServerAddr, message, []byte(secretKey))
+	response, err := core.Request(ServerAddr, message, []byte(secretKey))
 
 	// check response from server
 	if err != nil {
@@ -76,7 +78,7 @@ func (c *Component) startListener(port int, key string) error {
 			fmt.Println("Error accepting connection: \n", err)
 			continue
 		}
-		go connectionHandler(conn, key, c.MessageHandler)
+		go core.ConnectionHandler(conn, key, c.MessageHandler)
 	}
 }
 func (c *Component) GetComponents() ([]string, error) {
@@ -85,7 +87,7 @@ func (c *Component) GetComponents() ([]string, error) {
 	operationCode := []byte{69}
 
 	// send request to server
-	rawServerResponse, err := request(c.serverAddr, operationCode, c.key)
+	rawServerResponse, err := core.Request(c.serverAddr, operationCode, c.key)
 
 	// parse server response
 	var serverResponse []string
@@ -108,7 +110,7 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	serverMessage := append(operationCode, destinationBytes...)
 
 	// send request to server
-	rawServerResponse, err := request(c.serverAddr, serverMessage, c.key)
+	rawServerResponse, err := core.Request(c.serverAddr, serverMessage, c.key)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +128,7 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	}
 
 	// send request to other component
-	rawComponentResponse, err := request(destinationAddress, encodedBody, c.key)
+	rawComponentResponse, err := core.Request(destinationAddress, encodedBody, c.key)
 	if err != nil {
 		return nil, err
 	}

@@ -17,7 +17,7 @@ type tunnel struct {
 	Stop     bool
 }
 
-func NewTunnel(name string, Source chan byte, p int) *tunnel {
+func newTunnel(name string, Source chan byte, p int) *tunnel {
 
 	new_tunnel := &tunnel{
 		Name:     name,
@@ -41,7 +41,7 @@ func (t *tunnel) manageSource() {
 
 }
 
-func (t *tunnel) Start() error {
+func (t *tunnel) start() error {
 
 	// Make sure tunnel only runs once
 	t.mu.Lock()

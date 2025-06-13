@@ -2,18 +2,16 @@ package core
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
 
 	utils_header "github.com/Pois-Noir/Botzilla-Utils/header"
+	hmac "github.com/Pois-Noir/Botzilla-Utils/hmac"
 )
 
-func connectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
+func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
 
 	// karim design
 	// the decoder needs a conn object
@@ -56,7 +54,7 @@ func connectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	}
 
 	// verifying the hash
-	isValid := verifyHMAC(rawRequest, []byte(key), hash[:])
+	isValid := hmac.VerifyHMAC(rawRequest, []byte(key), hash[:])
 	if !isValid {
 		return
 	}
@@ -101,7 +99,7 @@ func connectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 
 }
 
-func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
+func Request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 
 	// start tcp call
 	conn, err := net.Dial("tcp", serverAddress)
@@ -121,7 +119,7 @@ func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 	header := buf.Bytes()
 
 	// Generate Hash
-	hash := generateHMAC(message, key)
+	hash := hmac.GenerateHMAC(message, key)
 
 	// Send token for auth
 	_, err = conn.Write(header)
@@ -157,18 +155,4 @@ func request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 	}
 
 	return rawResponse, nil
-}
-
-func generateHMAC(data []byte, key []byte) []byte {
-	mac := hmac.New(sha256.New, key) // 32 bytes
-	mac.Write(data)
-	return mac.Sum(nil)
-}
-
-func verifyHMAC(data []byte, key []byte, hash []byte) bool {
-	// Generate HMAC for the provided data using the same key
-	generatedHMAC := generateHMAC(data, key)
-
-	// Use subtle.ConstantTimeCompare to securely compare the two HMACs
-	return subtle.ConstantTimeCompare(generatedHMAC, hash) == 1
 }
