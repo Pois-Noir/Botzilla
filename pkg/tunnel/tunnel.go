@@ -1,30 +1,30 @@
-package botzilla
+package tunnel
 
 import (
 	"fmt"
 	"net"
 	"sync"
 
-	"github.com/Pois-Noir/Ren"
+	safemap "github.com/Pois-Noir/Botzilla-Utils/safemap"
 )
 
 type tunnel struct {
 	Name     string
 	source   chan byte
-	channels *Ren.SafeMap[net.Addr, chan byte]
+	channels *safemap.SafeMap[net.Addr, chan byte]
 	mu       sync.Mutex
 	port     int
 	Stop     bool
 }
 
-func newTunnel(name string, Source chan byte, p int) *tunnel {
+func NewTunnel(name string, Source chan byte, p int) *tunnel {
 
 	new_tunnel := &tunnel{
 		Name:     name,
 		source:   Source,
 		port:     p,
 		Stop:     false,
-		channels: Ren.NewSafeList[net.Addr, chan byte](),
+		channels: safemap.NewSafeMap[net.Addr, chan byte](),
 	}
 
 	return new_tunnel
@@ -41,7 +41,7 @@ func (t *tunnel) manageSource() {
 
 }
 
-func (t *tunnel) start() error {
+func (t *tunnel) Start() error {
 
 	// Make sure tunnel only runs once
 	t.mu.Lock()
