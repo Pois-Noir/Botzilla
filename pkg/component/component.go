@@ -42,6 +42,7 @@ func NewComponent(ServerAddr string, secretKey string, name string, port int) (*
 		"port": port,
 	}
 	// a new message with status code, operation code, and the actual payload
+	// TODO get the appropriate operation code or status code
 	message := utils_message.NewMessage(0, 0, compSetting)
 
 	// send the message and wait for the response
@@ -52,6 +53,7 @@ func NewComponent(ServerAddr string, secretKey string, name string, port int) (*
 	if err != nil {
 		return nil, err
 	}
+	// TODO fix this later
 	if string(response) != "registered" {
 		return nil, errors.New(string(response))
 	}
@@ -98,12 +100,16 @@ func (c *Component) startListener(port int, key string) error {
 
 func (c *Component) GetComponents() ([]string, error) {
 
-	// Operation code 2 is for Get All Component
-	operationCode := []byte{69}
+	// // Operation code 2 is for Get All Component
+	// operationCode := []byte{69}
 
-	// send request to server
-	rawServerResponse, err := core.Request(c.serverAddr, operationCode, c.key)
+	// // send request to server
+	// rawServerResponse, err := core.Request(c.serverAddr, operationCode, c.key)
 
+	// create the message to send the server
+	message := utils_message.NewMessage(0, 69, make(map[string]interface{}))
+
+	rawServerResponse, err := core.Request(c.serverAddr, message, c.key)
 	// parse server response
 	var serverResponse []string
 	err = json.Unmarshal(rawServerResponse, &serverResponse)
