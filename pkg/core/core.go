@@ -1,9 +1,7 @@
 package core
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"net"
 
@@ -13,17 +11,12 @@ import (
 
 	utils_header "github.com/Pois-Noir/Botzilla-Utils/header"
 	hmac "github.com/Pois-Noir/Botzilla-Utils/hmac"
+	utils_message "github.com/Pois-Noir/Botzilla-Utils/message"
+	"github.com/Pois-Noir/Mammad/decoder"
 )
 
-func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
+func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]interface{}) (map[string]interface{}, error)) {
 
-	// karim design
-	// the decoder needs a conn object
-	// i have the conn object as the parameter
-	// use the conn object to create a decoder
-	// the conn will be converted to a buffered reader by the decoder
-
-	// very good
 	defer conn.Close()
 
 	// creating a buffered Reader
@@ -36,16 +29,18 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 		// if there are errors we will send an appropriate response
 		// TODO create errors in the error package related to recieving and sending messages
 	}
+	// get the message length
 	requestSize := header.Length
-	// reading request
+	// buffer to store the message
 	rawRequest := make([]byte, requestSize)
 
-	// we need to read full
-	// there is no guarantee it will read upto the rawRequest
-	// depricated
-	// _, err = conn.Read(rawRequest)
-
-	// n represents the no of bytes read
+	// We use io.ReadFull to guarantee that we read exactly `requestSize` bytes.
+	// A normal conn.Read may return fewer bytes than requested if the kernel buffer doesn't contain all data yet.
+	// io.ReadFull retries reads internally until the buffer is filled or an error occurs.
+	//
+	// However, if there's a transmission error (e.g. connection dropped mid-transfer),
+	// io.ReadFull may return with an error *and* partial data (n < requestSize).
+	// That's why we check `n` to verify how many bytes were actually read — not just rely on the error.
 	n, err := io.ReadFull(bReader, rawRequest[:])
 	if n < int(requestSize) {
 
@@ -55,7 +50,7 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 		// log the error
 	}
 	if err != nil {
-
+		// do something
 	}
 
 	// reading request hash
@@ -77,98 +72,153 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	}
 
 	// parsing request
-	var request map[string]string
-	err = json.Unmarshal(rawRequest, &request)
+	decoder := decoder.NewDecoderBytes(rawRequest)
+	requestBody, err := decoder.Decode(len(rawRequest))
 	if err != nil {
-		fmt.Println("Error unmarshalling message: \n", err)
-		return
+		// tell the server
+		// maybe internal server error
 	}
 
 	// run the users callback
-	response, err := MessageHandler(request)
+	responseMap, err := MessageHandler(requestBody)
 	if err != nil {
 		fmt.Println("Error processing message: \n", err)
 		return
 	}
 
-	encodedResponse, err := json.Marshal(response)
+	response := utils_message.NewMessage(0, 0, responseMap)
+
+	responseBytes, err := response.Encode()
 	if err != nil {
-		fmt.Println("Error marshalling response: \n", err)
-		return
+		// speaking with amir
+		// call amir 438 282 3324
 	}
 
-	// Generate Header for server
-	ResponseLenght := int32(len(encodedResponse))
-	RawResponseHeader := new(bytes.Buffer)
-	err = binary.Write(RawResponseHeader, binary.LittleEndian, ResponseLenght) // LittleEndian like umar
+	_, err = conn.Write(responseBytes)
 	if err != nil {
-		fmt.Println("binary.Write failed:", err)
-		return
+
 	}
 
-	ResponseHeader := RawResponseHeader.Bytes()
-	_, err = conn.Write(ResponseHeader)
-	_, err = conn.Write(encodedResponse)
+	// // Generate Header for server
+	// ResponseLenght := int32(len(encodedResponse))
+	// RawResponseHeader := new(bytes.Buffer)
+	// err = binary.Write(RawResponseHeader, binary.LittleEndian, ResponseLenght) // LittleEndian like umar
+	// if err != nil {
+	// 	fmt.Println("binary.Write failed:", err)
+	// 	return
+	// }
 
-	if err != nil {
-		fmt.Println("Error sending response: \n", err)
-	}
+	// ResponseHeader := RawResponseHeader.Bytes()
+	// _, err = conn.Write(ResponseHeader)
+	// _, err = conn.Write(encodedResponse)
+
+	// if err != nil {
+	// 	fmt.Println("Error sending response: \n", err)
+	// }
 
 }
 
-func Request(serverAddress string, message []byte, key []byte) ([]byte, error) {
+// func Request(serverAddress string, message []byte, key []byte) ([]byte, error) {
 
-	// start tcp call
+// 	// start tcp call
+// 	conn, err := net.Dial("tcp", serverAddress)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer conn.Close()
+
+// 	// Generate Header
+// 	messageLength := int32(len(message))
+// 	buf := new(bytes.Buffer)
+// 	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
+// 	if err != nil {
+// 		fmt.Println("binary.Write failed:", err)
+// 		return nil, err
+// 	}
+// 	header := buf.Bytes()
+
+// 	// Generate Hash
+// 	hash := hmac.GenerateHMAC(message, key)
+
+// 	// Send token for auth
+// 	_, err = conn.Write(header)
+// 	_, err = conn.Write(message)
+// 	_, err = conn.Write(hash)
+
+// 	// TODO
+// 	// Might need better error handling here
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Reading Response Header (indicates response size)
+// 	responseHeader := [4]byte{}
+// 	_, err = conn.Read(responseHeader[:])
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Parsing Header
+// 	responseSize := int32(responseHeader[0]) |
+// 		int32(responseHeader[1])<<8 |
+// 		int32(responseHeader[2])<<16 |
+// 		int32(responseHeader[3])<<24
+
+// 	// Reading Response
+// 	rawResponse := make([]byte, responseSize)
+// 	_, err = conn.Read(rawResponse)
+
+// 	if err != nil {
+// 		fmt.Printf("Error reading from connection: %v\n", err)
+// 		return nil, err
+// 	}
+
+// 	return rawResponse, nil
+// }
+
+func Request(serverAddress string, messageMap map[string]interface{}, key []byte) ([]byte, error) {
+	// 1. Start TCP connection
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 
-	// Generate Header
-	messageLength := int32(len(message))
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, messageLength) // LittleEndian like umar
+	// 2. Create full message (header + payload)
+	message := utils_message.NewMessage(0, 0, messageMap)
+	messageBytes, err := message.Encode()
 	if err != nil {
-		fmt.Println("binary.Write failed:", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to encode message: %w", err)
 	}
-	header := buf.Bytes()
 
-	// Generate Hash
-	hash := hmac.GenerateHMAC(message, key)
+	// 3. Generate HMAC of the entire message (header + payload)
+	hash := hmac.GenerateHMAC(messageBytes, key)
 
-	// Send token for auth
-	_, err = conn.Write(header)
-	_, err = conn.Write(message)
+	// 4. Send message and HMAC
+	_, err = conn.Write(messageBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write message: %w", err)
+	}
 	_, err = conn.Write(hash)
-
-	// TODO
-	// Might need better error handling here
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write hash: %w", err)
 	}
 
-	// Reading Response Header (indicates response size)
-	responseHeader := [4]byte{}
-	_, err = conn.Read(responseHeader[:])
+	// 5. Read 4-byte response header (LittleEndian)
+	var responseHeader [4]byte
+	_, err = io.ReadFull(conn, responseHeader[:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read response header: %w", err)
 	}
 
-	// Parsing Header
-	responseSize := int32(responseHeader[0]) |
-		int32(responseHeader[1])<<8 |
-		int32(responseHeader[2])<<16 |
-		int32(responseHeader[3])<<24
+	// 6. Parse response length
+	responseSize := binary.LittleEndian.Uint32(responseHeader[:])
 
-	// Reading Response
+	// 7. Read response body
 	rawResponse := make([]byte, responseSize)
-	_, err = conn.Read(rawResponse)
-
+	_, err = io.ReadFull(conn, rawResponse)
 	if err != nil {
-		fmt.Printf("Error reading from connection: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	return rawResponse, nil
