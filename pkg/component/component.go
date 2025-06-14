@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 
+	utils_message "github.com/Pois-Noir/Botzilla-Utils/message"
 	"github.com/Pois-Noir/Botzilla/pkg/core"
 )
 
 type Component struct {
 	Name           string
-	MessageHandler func(map[string]string) (map[string]string, error)
+	MessageHandler func(map[string]interface{}) (map[string]interface{}, error)
 	tunnels        []*tunnel
 	serverAddr     string
 	key            []byte
@@ -20,22 +20,34 @@ type Component struct {
 
 func NewComponent(ServerAddr string, secretKey string, name string, port int) (*Component, error) {
 
+	// depricated
 	// Generate request content to server
 	// create a function for this
-	compSetting := map[string]string{}
+	// compSetting := map[string]string{}
 	//compSetting["operation_code"] =
-	compSetting["name"] = name
-	compSetting["port"] = strconv.Itoa(port)
-	// include our encoder
-	encodedCompsetting, err := json.Marshal(compSetting)
+	// compSetting["name"] = name
+	// compSetting["port"] = strconv.Itoa(port)
+	// // include our encoder
+	// encodedCompsetting, err := json.Marshal(compSetting)
 
-	// Operation code 0 is for registration
-	operationCode := []byte{0}
-	message := append(operationCode, encodedCompsetting...)
+	// // Operation code 0 is for registration
+	// operationCode := []byte{0}
+	// // message := append(operationCode, encodedCompsetting...)
 
-	// send request to server
+	// // send request to server
+	// response, err := core.Request(ServerAddr, message, []byte(secretKey))
+
+	compSetting := map[string]interface{}{
+		"name": name,
+		"port": port,
+	}
+	// a new message with status code, operation code, and the actual payload
+	message := utils_message.NewMessage(0, 0, compSetting)
+
+	// send the message and wait for the response
 	response, err := core.Request(ServerAddr, message, []byte(secretKey))
 
+	// need to speak to amir about the response from the server
 	// check response from server
 	if err != nil {
 		return nil, err
@@ -46,11 +58,13 @@ func NewComponent(ServerAddr string, secretKey string, name string, port int) (*
 
 	// generate component with empty message handler
 	comp := &Component{
-		Name:           name,
-		MessageHandler: func(m map[string]string) (map[string]string, error) { return make(map[string]string), nil },
-		key:            []byte(secretKey),
-		serverAddr:     ServerAddr,
-		tunnels:        make([]*tunnel, 0),
+		Name: name,
+		MessageHandler: func(m map[string]interface{}) (map[string]interface{}, error) {
+			return make(map[string]interface{}), nil
+		},
+		key:        []byte(secretKey),
+		serverAddr: ServerAddr,
+		tunnels:    make([]*tunnel, 0),
 	}
 
 	// run tcp listener

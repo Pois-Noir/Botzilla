@@ -173,10 +173,9 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 // 		return nil, err
 // 	}
 
-// 	return rawResponse, nil
-// }
-
-func Request(serverAddress string, messageMap map[string]interface{}, key []byte) ([]byte, error) {
+//		return rawResponse, nil
+//	}
+func Request(serverAddress string, message *utils_message.Message, key []byte) ([]byte, error) {
 	// 1. Start TCP connection
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
@@ -184,8 +183,6 @@ func Request(serverAddress string, messageMap map[string]interface{}, key []byte
 	}
 	defer conn.Close()
 
-	// 2. Create full message (header + payload)
-	message := utils_message.NewMessage(0, 0, messageMap)
 	messageBytes, err := message.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode message: %w", err)
