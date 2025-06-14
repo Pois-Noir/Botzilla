@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"net"
 
+	// for buffered reader
+	"bufio"
+	"io"
+
 	utils_header "github.com/Pois-Noir/Botzilla-Utils/header"
 	hmac "github.com/Pois-Noir/Botzilla-Utils/hmac"
 )
@@ -22,32 +26,45 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	// very good
 	defer conn.Close()
 
-	rcvdMsgHeader, err := utils_header.DecodeHeader(conn)
+	// creating a buffered Reader
+	bReader := bufio.NewReader(conn)
+	// read the header from the connection
+	// decode it and get a header struct
+	header, err := utils_header.DecodeHeaderBuffered(bReader)
 
 	if err != nil {
-		// TODO, header decoding problem
-		// we have to send the sender back a error message
-		// for retransmission
-		// send back error to sender
-		// send back and error message
+		// if there are errors we will send an appropriate response
+		// TODO create errors in the error package related to recieving and sending messages
 	}
-
-	// check the header
-
-	// getting message lengthg
-	requestSize := int32(requestHeader[0]) | // Convert Response Header to int32
-		int32(requestHeader[1])<<8 |
-		int32(requestHeader[2])<<16 |
-		int32(requestHeader[3])<<24
-
+	requestSize := header.Length
 	// reading request
 	rawRequest := make([]byte, requestSize)
-	// buffered Reader
-	_, err = conn.Read(rawRequest)
+
+	// we need to read full
+	// there is no guarantee it will read upto the rawRequest
+	// depricated
+	// _, err = conn.Read(rawRequest)
+
+	// n represents the no of bytes read
+	n, err := io.ReadFull(bReader, rawRequest[:])
+	if n < int(requestSize) {
+
+		// TOOD create errors in the errors package related to rcving bytes
+		// send a response back to the sender
+		// telling them the message was corrupted
+		// log the error
+	}
+	if err != nil {
+
+	}
 
 	// reading request hash
 	hash := [32]byte{}
-	_, err = conn.Read(hash[:])
+	n, err = bReader.Read(hash[:])
+	if n < 32 {
+		// TODO
+		// hash was corrupted
+	}
 	if err != nil {
 		fmt.Printf("Error reading from connection: %v\n", err)
 		return

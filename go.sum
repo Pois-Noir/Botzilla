@@ -1,9 +1,7 @@
-github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613022751-d7e07b28b362 h1:Zl3r0NNj7Ru75KGztifXfy+cTqmDsXzmqDsF40ojGnY=
-github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613022751-d7e07b28b362/go.mod h1:4KxDR2IW1E/P5nkLjOS8UE9kB4xJwEIkVkCbOU6KQHo=
-github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613034610-3fea488f045b h1:zXr6EZCW+6yFPq+U9KTv774zN4dDFxPplFjh8JhS4iQ=
-github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613034610-3fea488f045b/go.mod h1:4KxDR2IW1E/P5nkLjOS8UE9kB4xJwEIkVkCbOU6KQHo=
-github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613044130-6e44a12c2d42 h1:lRA2PHzmP53C5Ft70u9D+uBcBUkqOlmVrhZ8eJAUx3M=
-github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613044130-6e44a12c2d42/go.mod h1:4KxDR2IW1E/P5nkLjOS8UE9kB4xJwEIkVkCbOU6KQHo=
-github.com/Pois-Noir/Mammad v0.0.0-20250610000811-9bd7409e9ccf h1:Rbh05WUP1LxHNPPJyCdvngSHJ1QwYDR0MbtF0ckZ5h8=
-github.com/Pois-Noir/Mammad v0.0.0-20250610000811-9bd7409e9ccf/go.mod h1:FCViZqp8RSRMfh9N7R3WSPu3SSS/hToV8w4rTmnEmNk=
+github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613233707-a2d114dd8714 h1:L2ShubhvUpcT43jf6xi/SO6P6Hzf1WuE+uzzzYzpqt8=
+github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613233707-a2d114dd8714/go.mod h1:4KxDR2IW1E/P5nkLjOS8UE9kB4xJwEIkVkCbOU6KQHo=
+github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613234636-66f13253c904 h1:zSi+x7EoEtMBWFePjuXeipW3UbzGc9DmCCDBAj7Sw6Y=
+github.com/Pois-Noir/Botzilla-Utils v0.0.0-20250613234636-66f13253c904/go.mod h1:4KxDR2IW1E/P5nkLjOS8UE9kB4xJwEIkVkCbOU6KQHo=
+github.com/Pois-Noir/Mammad v0.0.0-20250613225743-6ad6bf59f818 h1:E+ikGbr3hvjk9GxdQniNhtsm3HxMNXFYU5ZCplkO2fE=
+github.com/Pois-Noir/Mammad v0.0.0-20250613225743-6ad6bf59f818/go.mod h1:FCViZqp8RSRMfh9N7R3WSPu3SSS/hToV8w4rTmnEmNk=
 github.com/Pois-Noir/Ren v0.0.0-20250604215632-2119cd8e88a3/go.mod h1:4QXw+ta16kF6D16owzkX0DGE9wTR2U6NK27wObdRbsE=

@@ -81,6 +81,7 @@ func (c *Component) startListener(port int, key string) error {
 		go core.ConnectionHandler(conn, key, c.MessageHandler)
 	}
 }
+
 func (c *Component) GetComponents() ([]string, error) {
 
 	// Operation code 2 is for Get All Component
