@@ -2,69 +2,52 @@ package component
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
 
 	global_configs "github.com/Pois-Noir/Botzilla-Utils/global_configs"
-	utils_message "github.com/Pois-Noir/Botzilla-Utils/message"
 	"github.com/Pois-Noir/Botzilla/pkg/core"
 )
 
 type Component struct {
-	Name           string
-	MessageHandler func(map[string]string) (map[string]string, error)
-	tunnels        []*tunnel
-	serverAddr     string
-	key            []byte
+	Name       string
+	OnMessage  func(map[string]string) (map[string]string, error)
+	tunnels    []*tunnel
+	serverAddr string
+	key        []byte
 }
 
 func NewComponent(ServerAddr string, secretKey string, name string, port int) (*Component, error) {
 
-	// depricated
-	// Generate request content to server
-	// create a function for this
-	// compSetting := map[string]string{}
-	//compSetting["operation_code"] =
-	// compSetting["name"] = name
-	// compSetting["port"] = strconv.Itoa(port)
-	// // include our encoder
-	// encodedCompsetting, err := json.Marshal(compSetting)
-
-	// // Operation code 0 is for registration
-	// operationCode := []byte{0}
-	// // message := append(operationCode, encodedCompsetting...)
-
-	// // send request to server
-	// response, err := core.Request(ServerAddr, message, []byte(secretKey))
-
-	compSetting := map[string]string{
+	payload := map[string]string{
 		"name": name,
 		"port": strconv.Itoa(port),
 	}
-	// a new message with status code, operation code, and the actual payload
-	// TODO get the appropriate operation code or status code
-	message := utils_message.NewMessage(0, 0, compSetting)
 
-	// send the message and wait for the response
-	response, err := core.Request(ServerAddr, message, []byte(secretKey))
+	encodedPayload, err := json.Marshal(payload)
 
-	// need to speak to amir about the response from the server
-	// check response from server
 	if err != nil {
 		return nil, err
 	}
-	// TODO fix this later
-	if string(response) != "registered" {
-		return nil, errors.New(string(response))
+
+	// send the message and wait for the response
+	_, err = core.Request(
+		ServerAddr,
+		encodedPayload,
+		global_configs.REGISTER_COMPONENT_OPERATION_CODE,
+		[]byte(secretKey),
+	)
+
+	if err != nil {
+		return nil, err
 	}
 
 	// generate component with empty message handler
 	comp := &Component{
 		Name: name,
-		MessageHandler: func(m map[string]interface{}) (map[string]interface{}, error) {
-			return make(map[string]interface{}), nil
+		OnMessage: func(m map[string]string) (map[string]string, error) {
+			return make(map[string]string), nil
 		},
 		key:        []byte(secretKey),
 		serverAddr: ServerAddr,
@@ -96,7 +79,7 @@ func (c *Component) startListener(port int, key string) error {
 			fmt.Println("Error accepting connection: \n", err)
 			continue
 		}
-		go core.ConnectionHandler(conn, key, c.MessageHandler)
+		go core.ConnectionHandler(conn, key, c.OnMessage)
 	}
 }
 
@@ -108,6 +91,10 @@ func (c *Component) GetComponents() ([]string, error) {
 		global_configs.GET_COMPONENTS_OPERATION_CODE,
 		c.key,
 	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// parse server response
 	var serverResponse []string
