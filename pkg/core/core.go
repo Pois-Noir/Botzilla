@@ -111,7 +111,7 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 
 }
 
-func Request(serverAddress string, payload []byte, key []byte, operationCode byte) ([]byte, error) {
+func Request(serverAddress string, payload []byte, operationCode byte, key []byte) ([]byte, error) {
 
 	// 1. Start TCP connection
 	conn, err := net.Dial("tcp", serverAddress)

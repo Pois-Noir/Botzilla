@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 
+	global_configs "github.com/Pois-Noir/Botzilla-Utils/global_configs"
 	utils_message "github.com/Pois-Noir/Botzilla-Utils/message"
 	"github.com/Pois-Noir/Botzilla/pkg/core"
 )
@@ -101,16 +102,13 @@ func (c *Component) startListener(port int, key string) error {
 
 func (c *Component) GetComponents() ([]string, error) {
 
-	// // Operation code 2 is for Get All Component
-	// operationCode := []byte{69}
+	rawServerResponse, err := core.Request(
+		c.serverAddr,
+		[]byte{},
+		global_configs.GET_COMPONENTS_OPERATION_CODE,
+		c.key,
+	)
 
-	// // send request to server
-	// rawServerResponse, err := core.Request(c.serverAddr, operationCode, c.key)
-
-	// create the message to send the server
-	// message := utils_message.NewMessage(0, 69, make(map[string]interface{}))
-
-	rawServerResponse, err := core.Request(c.serverAddr, message, c.key)
 	// parse server response
 	var serverResponse []string
 	err = json.Unmarshal(rawServerResponse, &serverResponse)
@@ -127,30 +125,36 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	// Generate request content to server
 	destinationBytes := []byte(componentName)
 
-	// Operation code 2 is for Get Component
-	operationCode := []byte{2}
-	serverMessage := append(operationCode, destinationBytes...)
-
 	// send request to server
-	rawServerResponse, err := core.Request(c.serverAddr, serverMessage, c.key)
+	rawServerResponse, err := core.Request(
+		c.serverAddr,
+		destinationBytes,
+		global_configs.GET_COMPONENT_OPERATION_CODE,
+		c.key,
+	)
+
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO!!!
-	// Server response has to be checked
 
 	// Parsing server response to tcp address
 	destinationAddress := string(rawServerResponse)
 
 	// Encoding message content
 	encodedBody, err := json.Marshal(message)
+
 	if err != nil {
 		return nil, err
 	}
 
 	// send request to other component
-	rawComponentResponse, err := core.Request(destinationAddress, encodedBody, c.key)
+	rawComponentResponse, err := core.Request(
+		destinationAddress,
+		encodedBody,
+		global_configs.USER_MESSAGE_OPERATION_CODE,
+		c.key,
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +162,7 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	// parse component response
 	var componentResponse map[string]string
 	err = json.Unmarshal(rawComponentResponse, &componentResponse)
+
 	if err != nil {
 		return nil, err
 	}
