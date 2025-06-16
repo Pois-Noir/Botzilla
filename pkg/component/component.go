@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	utils_message "github.com/Pois-Noir/Botzilla-Utils/message"
 	"github.com/Pois-Noir/Botzilla/pkg/core"
@@ -12,7 +13,7 @@ import (
 
 type Component struct {
 	Name           string
-	MessageHandler func(map[string]interface{}) (map[string]interface{}, error)
+	MessageHandler func(map[string]string) (map[string]string, error)
 	tunnels        []*tunnel
 	serverAddr     string
 	key            []byte
@@ -37,9 +38,9 @@ func NewComponent(ServerAddr string, secretKey string, name string, port int) (*
 	// // send request to server
 	// response, err := core.Request(ServerAddr, message, []byte(secretKey))
 
-	compSetting := map[string]interface{}{
+	compSetting := map[string]string{
 		"name": name,
-		"port": port,
+		"port": strconv.Itoa(port),
 	}
 	// a new message with status code, operation code, and the actual payload
 	// TODO get the appropriate operation code or status code

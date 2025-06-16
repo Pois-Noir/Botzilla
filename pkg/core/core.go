@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 
@@ -9,13 +8,15 @@ import (
 	"bufio"
 	"io"
 
-	utils_header "github.com/Pois-Noir/Botzilla-Utils/header"
+	"github.com/Pois-Noir/Botzilla-Utils/global_configs"
+	global_configs "github.com/Pois-Noir/Botzilla-Utils/global_configs"
+	header "github.com/Pois-Noir/Botzilla-Utils/header"
 	hmac "github.com/Pois-Noir/Botzilla-Utils/hmac"
-	utils_message "github.com/Pois-Noir/Botzilla-Utils/message"
 	"github.com/Pois-Noir/Mammad/decoder"
+	"github.com/Pois-Noir/Mammad/encoder"
 )
 
-func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]interface{}) (map[string]interface{}, error)) {
+func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
 
 	defer conn.Close()
 
@@ -23,7 +24,12 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	bReader := bufio.NewReader(conn)
 	// read the header from the connection
 	// decode it and get a header struct
-	header, err := utils_header.DecodeHeaderBuffered(bReader)
+
+	var headerBuffer [global_configs.Header_LENGTH]byte
+	// TODO
+	// CHeck the error
+	_, err := io.ReadFull(bReader, headerBuffer[:])
+	header, err := header.Decode(bReader)
 
 	if err != nil {
 		// if there are errors we will send an appropriate response
@@ -55,7 +61,7 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 
 	// reading request hash
 	hash := [32]byte{}
-	n, err = bReader.Read(hash[:])
+	n, err = io.ReadFull(bReader, hash[:])
 	if n < 32 {
 		// TODO
 		// hash was corrupted
@@ -74,48 +80,51 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	// parsing request
 	decoder := decoder.NewDecoderBytes(rawRequest)
 	requestBody, err := decoder.Decode(len(rawRequest))
+
+	convertedRequestBody := convertToStringMap(requestBody)
+
 	if err != nil {
 		// tell the server
 		// maybe internal server error
 	}
 
 	// run the users callback
-	responseMap, err := MessageHandler(requestBody)
+	responsePayload, err := MessageHandler(convertedRequestBody)
 	if err != nil {
 		fmt.Println("Error processing message: \n", err)
 		return
 	}
 
-	response := utils_message.NewMessage(0, 0, responseMap)
+	encoder = encoder.NewEncoder(responsePayload)
+	responsePayloadBuffer := encoder.encode()
 
-	responseBytes, err := response.Encode()
+	responseHeader := header.NewHeader(
+		global_configs.OK_STATUS,
+		global_configs.USER_MESSAGE_OPERATION_CODE,
+		len(responsePayloadBuffer),
+	)
+
+	responseHeaderBuffer, err := responseHeader.Encode()
 	if err != nil {
 		// speaking with amir
 		// call amir 438 282 3324
 	}
+
+	response := append(responseHeaderBuffer, responsePayloadBuffer)
 
 	_, err = conn.Write(responseBytes)
 	if err != nil {
 
 	}
 
-	// // Generate Header for server
-	// ResponseLenght := int32(len(encodedResponse))
-	// RawResponseHeader := new(bytes.Buffer)
-	// err = binary.Write(RawResponseHeader, binary.LittleEndian, ResponseLenght) // LittleEndian like umar
-	// if err != nil {
-	// 	fmt.Println("binary.Write failed:", err)
-	// 	return
-	// }
+}
 
-	// ResponseHeader := RawResponseHeader.Bytes()
-	// _, err = conn.Write(ResponseHeader)
-	// _, err = conn.Write(encodedResponse)
-
-	// if err != nil {
-	// 	fmt.Println("Error sending response: \n", err)
-	// }
-
+func convertToStringMap(input map[string]interface{}) map[string]string {
+	result := make(map[string]string)
+	for key, val := range input {
+		result[key] = fmt.Sprint(val)
+	}
+	return result
 }
 
 // func Request(serverAddress string, message []byte, key []byte) ([]byte, error) {
@@ -175,7 +184,8 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 
 //		return rawResponse, nil
 //	}
-func Request(serverAddress string, message *utils_message.Message, key []byte) ([]byte, error) {
+func Request(serverAddress string, payload []byte, key []byte, operationCode byte) ([]byte, error) {
+
 	// 1. Start TCP connection
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
@@ -183,16 +193,23 @@ func Request(serverAddress string, message *utils_message.Message, key []byte) (
 	}
 	defer conn.Close()
 
-	messageBytes, err := message.Encode()
+	// messageBytes, err := message.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode message: %w", err)
 	}
 
 	// 3. Generate HMAC of the entire message (header + payload)
-	hash := hmac.GenerateHMAC(messageBytes, key)
+	hash := hmac.GenerateHMAC(payload, key)
 
+	requestHeader := header.NewHeader(global_configs.OK_STATUS, operationCode, len(message))
+	encodedHeader := requestHeader.Encode()
+
+	message := append(encodedHeader, payload)
+
+	// TODO
+	// Make one io call for speed
 	// 4. Send message and HMAC
-	_, err = conn.Write(messageBytes)
+	_, err = conn.Write(message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write message: %w", err)
 	}
@@ -201,18 +218,19 @@ func Request(serverAddress string, message *utils_message.Message, key []byte) (
 		return nil, fmt.Errorf("failed to write hash: %w", err)
 	}
 
-	// 5. Read 4-byte response header (LittleEndian)
-	var responseHeader [4]byte
+	// 5. Read 4-byte response header
+	var responseHeaderBuffer [global_configs.HEADERLENGTH]byte
 	_, err = io.ReadFull(conn, responseHeader[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response header: %w", err)
 	}
 
-	// 6. Parse response length
-	responseSize := binary.LittleEndian.Uint32(responseHeader[:])
+	responseHeader := header.Decode(responseHeaderBuffer)
+	// TODO
+	// Check if status was ok
 
 	// 7. Read response body
-	rawResponse := make([]byte, responseSize)
+	rawResponse := make([]byte, responseHeader.Length)
 	_, err = io.ReadFull(conn, rawResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
