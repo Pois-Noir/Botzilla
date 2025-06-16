@@ -1,19 +1,15 @@
 package core
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 
-	// for buffered reader
-	"bufio"
-	"io"
-
-	"github.com/Pois-Noir/Botzilla-Utils/global_configs"
 	global_configs "github.com/Pois-Noir/Botzilla-Utils/global_configs"
-	header "github.com/Pois-Noir/Botzilla-Utils/header"
+	header_pkg "github.com/Pois-Noir/Botzilla-Utils/header"
 	hmac "github.com/Pois-Noir/Botzilla-Utils/hmac"
-	"github.com/Pois-Noir/Mammad/decoder"
-	"github.com/Pois-Noir/Mammad/encoder"
 )
 
 func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
@@ -22,103 +18,97 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 
 	// creating a buffered Reader
 	bReader := bufio.NewReader(conn)
-	// read the header from the connection
-	// decode it and get a header struct
 
-	var headerBuffer [global_configs.Header_LENGTH]byte
+	var headerBuffer [global_configs.HEADER_LENGTH]byte
+	_, err := io.ReadFull(bReader, headerBuffer[:])
 
 	// TODO
-	// CHeck the error
-	_, err := io.ReadFull(bReader, headerBuffer[:])
-	header, err := header.Decode(bReader)
-
 	if err != nil {
-		// TODO create errors in the error package related to recieving and sending messages
+		return
+	}
+
+	header, err := header_pkg.Decode(headerBuffer[:])
+
+	// TODO
+	if err != nil {
+		return
 	}
 	// get the message length
 	requestSize := header.PayloadLength
-	rawRequest := make([]byte, requestSize)
+	RequestPayloadBuffer := make([]byte, requestSize)
 
 	// We use io.ReadFull to guarantee that we read exactly `requestSize` bytes.
-	n, err := io.ReadFull(bReader, rawRequest)
-	if n < int(requestSize) {
+	n, err := io.ReadFull(bReader, RequestPayloadBuffer)
 
-		// TOOD create errors in the errors package related to rcving bytes
-		// send a response back to the sender
-		// telling them the message was corrupted
-		// log the error
+	// TODO
+	if uint32(n) < requestSize {
+		return
 	}
+	// TODO
 	if err != nil {
-		// TODO
-		// do something
+		return
 	}
 
 	// reading request hash
 	hash := [32]byte{}
 	n, err = io.ReadFull(bReader, hash[:])
-	if n < 32 {
-		// TODO
-		// hash was corrupted
-	}
+
+	// TODO
 	if err != nil {
-		fmt.Printf("Error reading from connection: %v\n", err)
 		return
 	}
 
+	// TODO
+	if n < 32 {
+		// hash was corrupted
+	}
+
 	// verifying the hash
-	isValid := hmac.VerifyHMAC(rawRequest, []byte(key), hash[:])
+	isValid := hmac.VerifyHMAC(RequestPayloadBuffer, []byte(key), hash[:])
+	// TODO
 	if !isValid {
 		return
 	}
 
 	// parsing request
-	decoder := decoder.NewDecoderBytes(rawRequest)
-	requestBody, err := decoder.Decode(len(rawRequest))
+	RequestPayload := map[string]string{}
+	err = json.Unmarshal(RequestPayloadBuffer[:], &RequestPayload)
 
-	convertedRequestBody := convertToStringMap(requestBody)
-
+	// TODO
 	if err != nil {
-		// tell the server
-		// maybe internal server error
+		return
 	}
 
-	// run the users callback
-	responsePayload, err := MessageHandler(convertedRequestBody)
+	// run user callback
+	ResponsePayload, err := MessageHandler(RequestPayload)
+
+	// TODO
+	if err != nil {
+		return
+	}
+
+	ResponsePayloadBuffer, err := json.Marshal(ResponsePayload)
+
+	// TODO
 	if err != nil {
 		fmt.Println("Error processing message: \n", err)
 		return
 	}
 
-	encoder = encoder.NewEncoder(responsePayload)
-	responsePayloadBuffer := encoder.encode()
-
-	responseHeader := header.NewHeader(
+	ResponseHeader := header_pkg.NewHeader(
 		global_configs.OK_STATUS,
 		global_configs.USER_MESSAGE_OPERATION_CODE,
-		len(responsePayloadBuffer),
+		uint32(len(ResponsePayloadBuffer)),
 	)
+	ResponseHeaderBuffer := ResponseHeader.Encode()
 
-	responseHeaderBuffer, err := responseHeader.Encode()
+	ResponseBuffer := append(ResponseHeaderBuffer, ResponsePayloadBuffer...)
+	_, err = conn.Write(ResponseBuffer)
+
 	if err != nil {
-		// speaking with amir
-		// call amir 438 282 3324
+		return
 	}
 
-	response := append(responseHeaderBuffer, responsePayloadBuffer)
-
-	_, err = conn.Write(responseBytes)
-	if err != nil {
-
-	}
-
-}
-
-func convertToStringMap(input map[string]interface{}) map[string]string {
-	result := make(map[string]string)
-	for key, val := range input {
-		result[key] = fmt.Sprint(val)
-	}
-	return result
 }
 
 func Request(serverAddress string, payload []byte, key []byte, operationCode byte) ([]byte, error) {
@@ -130,23 +120,23 @@ func Request(serverAddress string, payload []byte, key []byte, operationCode byt
 	}
 	defer conn.Close()
 
-	// messageBytes, err := message.Encode()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode message: %w", err)
-	}
-
 	// 3. Generate HMAC of the entire message (header + payload)
 	hash := hmac.GenerateHMAC(payload, key)
 
-	requestHeader := header.NewHeader(global_configs.OK_STATUS, operationCode, len(message))
+	requestHeader := header_pkg.NewHeader(
+		global_configs.OK_STATUS,
+		operationCode,
+		uint32(len(payload)),
+	)
 	encodedHeader := requestHeader.Encode()
 
-	message := append(encodedHeader, payload)
+	message := append(encodedHeader, payload...)
 
-	// TODO
 	// Make one io call for speed
 	// 4. Send message and HMAC
 	_, err = conn.Write(message)
+
+	// TODO
 	if err != nil {
 		return nil, fmt.Errorf("failed to write message: %w", err)
 	}
@@ -156,18 +146,22 @@ func Request(serverAddress string, payload []byte, key []byte, operationCode byt
 	}
 
 	// 5. Read 4-byte response header
-	var responseHeaderBuffer [global_configs.HEADERLENGTH]byte
-	_, err = io.ReadFull(conn, responseHeader[:])
+	var responseHeaderBuffer [global_configs.HEADER_LENGTH]byte
+	_, err = io.ReadFull(conn, responseHeaderBuffer[:])
+	// TODO
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response header: %w", err)
 	}
 
-	responseHeader := header.Decode(responseHeaderBuffer)
+	responseHeader, err := header_pkg.Decode(responseHeaderBuffer[:])
 	// TODO
+	if err != nil {
+
+	}
 	// Check if status was ok
 
 	// 7. Read response body
-	rawResponse := make([]byte, responseHeader.Length)
+	rawResponse := make([]byte, responseHeader.PayloadLength)
 	_, err = io.ReadFull(conn, rawResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)

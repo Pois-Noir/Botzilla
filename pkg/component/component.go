@@ -108,7 +108,7 @@ func (c *Component) GetComponents() ([]string, error) {
 	// rawServerResponse, err := core.Request(c.serverAddr, operationCode, c.key)
 
 	// create the message to send the server
-	message := utils_message.NewMessage(0, 69, make(map[string]interface{}))
+	// message := utils_message.NewMessage(0, 69, make(map[string]interface{}))
 
 	rawServerResponse, err := core.Request(c.serverAddr, message, c.key)
 	// parse server response
