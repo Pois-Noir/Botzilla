@@ -20,7 +20,12 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	bReader := bufio.NewReader(conn)
 
 	var headerBuffer [global_configs.HEADER_LENGTH]byte
-	_, err := io.ReadFull(bReader, headerBuffer[:])
+	n, err := io.ReadFull(bReader, headerBuffer[:])
+
+	// TODO
+	if n != global_configs.HEADER_LENGTH {
+		return
+	}
 
 	// TODO
 	if err != nil {
@@ -38,7 +43,7 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	RequestPayloadBuffer := make([]byte, requestSize)
 
 	// We use io.ReadFull to guarantee that we read exactly `requestSize` bytes.
-	n, err := io.ReadFull(bReader, RequestPayloadBuffer)
+	n, err = io.ReadFull(bReader, RequestPayloadBuffer)
 
 	// TODO
 	if uint32(n) < requestSize {
