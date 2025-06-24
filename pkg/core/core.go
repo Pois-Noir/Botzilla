@@ -12,7 +12,7 @@ import (
 	hmac "github.com/Pois-Noir/Botzilla-Utils/hmac"
 )
 
-func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string]string) (map[string]string, error)) {
+func ConnectionHandler(conn net.Conn, key []byte, MessageHandler func(map[string]string) (map[string]string, error)) {
 
 	defer conn.Close()
 
@@ -69,7 +69,7 @@ func ConnectionHandler(conn net.Conn, key string, MessageHandler func(map[string
 	}
 
 	// verifying the hash
-	isValid := hmac.VerifyHMAC(RequestPayloadBuffer, []byte(key), hash[:])
+	isValid := hmac.VerifyHMAC(RequestPayloadBuffer, key, hash[:])
 	// TODO
 	if !isValid {
 		return
