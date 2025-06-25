@@ -1,4 +1,4 @@
-package component
+package botzilla
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"github.com/Pois-Noir/Botzilla-Utils/global_configs"
 	"net"
 
-	"github.com/Pois-Noir/Botzilla/pkg/core"
 	"github.com/grandcat/zeroconf"
 )
 
@@ -15,11 +14,10 @@ type Component struct {
 	server    *zeroconf.Server
 	OnMessage func(map[string]string) (map[string]string, error)
 	tunnels   []*tunnel
-	//serverAddr string
-	key []byte
+	key       []byte
 }
 
-func NewComponent(name string, secretKey string, port int) (*Component, error) {
+func NewComponent(name string, secretKey string) (*Component, error) {
 	// generate component with empty message handler
 	comp := &Component{
 		Name: name,
@@ -31,7 +29,7 @@ func NewComponent(name string, secretKey string, port int) (*Component, error) {
 	}
 
 	// run tcp listener
-	err := comp.startListening(port)
+	port, err := comp.startListening()
 	if err != nil {
 		return nil, err
 	}
@@ -55,17 +53,20 @@ func NewComponent(name string, secretKey string, port int) (*Component, error) {
 
 }
 
-func (c *Component) startListening(port int) error {
+func (c *Component) startListening() (int, error) {
 
 	// start tcp listener
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	listener, err := net.Listen("tcp", ":0") // open on the random free port
 	if err != nil {
-		return err
+		return -1, err
 	}
+
+	// get the port
+	port := listener.Addr().(*net.TCPAddr).Port
 
 	go c.handleTCP(listener)
 
-	return nil
+	return port, nil
 }
 
 func (c *Component) handleTCP(listener net.Listener) {
@@ -79,7 +80,7 @@ func (c *Component) handleTCP(listener net.Listener) {
 			fmt.Println("Error accepting connection: \n", err)
 			continue
 		}
-		go core.ConnectionHandler(conn, c.key, c.OnMessage)
+		go ConnectionHandler(conn, c.key, c.OnMessage)
 	}
 }
 
@@ -98,7 +99,7 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	}
 	//
 	//// send request to other component
-	rawComponentResponse, err := core.Request(
+	rawComponentResponse, err := Request(
 		compIP,
 		encodedBody,
 		global_configs.USER_MESSAGE_OPERATION_CODE,
@@ -118,11 +119,6 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	}
 
 	return componentResponse, nil
-}
-
-// TODO :O
-func (c *Component) GetComponents() ([]string, error) {
-	return nil, nil
 }
 
 // TODO

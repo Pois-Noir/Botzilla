@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/Pois-Noir/Botzilla/pkg/component"
+	botzilla "github.com/Pois-Noir/Botzilla"
 )
 
 func main() {
 
-	c1, err := component.NewComponent("c1", "ppap", 4000)
+	c1, err := botzilla.NewComponent("c1", "ppap")
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	c1.OnMessage = func(m map[string]string) (map[string]string, error) {
 		fmt.Println(m)
@@ -17,13 +19,10 @@ func main() {
 		return response, nil
 	}
 
-	if err != nil {
-		fmt.Println(err)
-	}
 	request := map[string]string{}
 	request["Hello"] = "World"
 
-	c2, err := component.NewComponent("c2", "ppap", 4001)
+	c2, err := botzilla.NewComponent("c2", "ppap")
 	if err != nil {
 		fmt.Println(err)
 	}
