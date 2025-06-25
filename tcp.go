@@ -161,7 +161,7 @@ func Request(serverAddress string, payload []byte, operationCode byte, key []byt
 	responseHeader, err := header_pkg.Decode(responseHeaderBuffer[:])
 	// TODO
 	if err != nil {
-
+		return nil, err
 	}
 	// Check if status was ok
 
