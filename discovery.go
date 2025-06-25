@@ -1,4 +1,4 @@
-package component
+package botzilla
 
 import (
 	"github.com/grandcat/zeroconf"
