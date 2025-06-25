@@ -83,14 +83,12 @@ func (c *Component) handleTCP(listener net.Listener) {
 	}
 }
 
-// TODO :O
-func (c *Component) GetComponents() ([]string, error) {
-
-	return nil, nil
-
-}
-
 func (c *Component) SendMessage(componentName string, message map[string]string) (map[string]string, error) {
+
+	compIP, err := GetComponent(componentName)
+	if err != nil {
+		return nil, err
+	}
 
 	//// Encoding message content
 	encodedBody, err := json.Marshal(message)
@@ -101,7 +99,7 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 	//
 	//// send request to other component
 	rawComponentResponse, err := core.Request(
-		destinationAddress,
+		compIP,
 		encodedBody,
 		global_configs.USER_MESSAGE_OPERATION_CODE,
 		c.key,
@@ -119,6 +117,11 @@ func (c *Component) SendMessage(componentName string, message map[string]string)
 		return nil, err
 	}
 
+	return componentResponse, nil
+}
+
+// TODO :O
+func (c *Component) GetComponents() ([]string, error) {
 	return nil, nil
 }
 
